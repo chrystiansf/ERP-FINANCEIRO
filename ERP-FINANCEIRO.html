@@ -2268,6 +2268,10 @@
                                 </div>
                             </div>
                         </div>
+                        <div class="form-group" style="margin: 10px 0 15px;">
+                            <label style="font-size: 0.85rem;">Observação (opcional):</label>
+                            <textarea id="dre-observacao" rows="2" placeholder="Notas ou observações para o relatório..." style="width:100%;padding:6px 8px;border:1px solid var(--border-color);border-radius:6px;background:var(--bg-input);color:var(--text-primary);font-family:inherit;font-size:0.82rem;resize:vertical;"></textarea>
+                        </div>
                         <div class="form-row">
                             <button class="btn btn-secondary" onclick="app.exportCategoryReport('pdf')" style="flex: 1;">
                                 <i class="fas fa-file-pdf"></i>
@@ -7066,7 +7070,8 @@ exportCategoryReport(format) {
     }
     
     if (format === 'pdf') {
-        this.exportCategoryToPDF(days, startDate, endDate);
+        const obs = (document.getElementById('dre-observacao')?.value || '').trim();
+        this.exportCategoryToPDF(days, startDate, endDate, obs);
     } else if (format === 'excel') {
         this.exportCategoryToExcel(days, startDate, endDate);
     }
@@ -7075,7 +7080,7 @@ exportCategoryReport(format) {
 
 
 
-exportCategoryToPDF(days, startDate, endDate) {
+exportCategoryToPDF(days, startDate, endDate, observacao = '') {
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF('portrait', 'mm', 'a4');
 
@@ -7114,11 +7119,10 @@ exportCategoryToPDF(days, startDate, endDate) {
     const st = (r,g,b) => doc.setTextColor(r,g,b);
     const sd = (r,g,b) => doc.setDrawColor(r,g,b);
 
-    // ── CABEÇALHO ─────────────────────────────────────────────────────────────
-    // Barra superior fina preta
-    sf(0,0,0); doc.rect(0, 0, W, 1.5, 'F');
+    const DARK = [60,60,60]; // cinza escuro
 
-    // Área do cabeçalho branca com borda inferior
+    // ── CABEÇALHO ─────────────────────────────────────────────────────────────
+    sf(...DARK); doc.rect(0, 0, W, 1.5, 'F');
     sf(255,255,255); doc.rect(0, 1.5, W, 36, 'F');
 
     // Logo (se existir): canto esquerdo, tamanho maior
@@ -7132,35 +7136,33 @@ exportCategoryToPDF(days, startDate, endDate) {
     }
 
     // Nome da empresa e título do relatório
-    doc.setFontSize(7); doc.setFont('helvetica','normal'); st(100,100,100);
+    doc.setFontSize(7); doc.setFont('helvetica','normal'); st(110,110,110);
     doc.text(systemName.toUpperCase(), headerTextX, 12);
-    doc.setFontSize(13); doc.setFont('helvetica','bold'); st(0,0,0);
+    doc.setFontSize(13); doc.setFont('helvetica','bold'); st(...DARK);
     doc.text('DEMONSTRAÇÃO DO RESULTADO DO EXERCÍCIO', headerTextX, 20);
-    doc.setFontSize(7.5); doc.setFont('helvetica','normal'); st(90,90,90);
+    doc.setFontSize(7.5); doc.setFont('helvetica','normal'); st(100,100,100);
     doc.text(`Período: ${periodText}   •   Emissão: ${new Date().toLocaleDateString('pt-BR')}`, headerTextX, 27);
 
     // Linha divisória cabeçalho
-    sd(0,0,0); doc.setLineWidth(0.5);
+    sd(...DARK); doc.setLineWidth(0.5);
     doc.line(0, 37.5, W, 37.5);
     doc.setLineWidth(0.2);
 
-    // ── 3 BLOCOS RESUMO (tons neutros) ────────────────────────────────────────
+    // ── 3 BLOCOS RESUMO ───────────────────────────────────────────────────────
     const bW = CW / 3 - 3;
     const summaryBlocks = [
-        { label: 'RECEITA BRUTA',     val: this.formatCurrency(totalRec),              sign: '+' },
-        { label: 'TOTAL DE DESPESAS', val: this.formatCurrency(totalDesp),             sign: '-' },
-        { label: 'RESULTADO LÍQUIDO', val: this.formatCurrency(Math.abs(resultado)),   sign: resultado >= 0 ? '+' : '-' },
+        { label: 'RECEITA BRUTA',     val: this.formatCurrency(totalRec),            sign: '+' },
+        { label: 'TOTAL DE DESPESAS', val: this.formatCurrency(totalDesp),           sign: '-' },
+        { label: 'RESULTADO LÍQUIDO', val: this.formatCurrency(Math.abs(resultado)), sign: resultado >= 0 ? '+' : '-' },
     ];
     summaryBlocks.forEach((b, i) => {
         const x = ML + i * (bW + 3);
         sf(240,240,240); doc.rect(x, 40, bW, 16, 'F');
-        sd(180,180,180); doc.setLineWidth(0.15);
-        doc.rect(x, 40, bW, 16, 'S');
-        // Topo preto
-        sf(0,0,0); doc.rect(x, 40, bW, 1.2, 'F');
-        doc.setFontSize(6); doc.setFont('helvetica','bold'); st(80,80,80);
+        sd(185,185,185); doc.setLineWidth(0.15); doc.rect(x, 40, bW, 16, 'S');
+        sf(...DARK); doc.rect(x, 40, bW, 1.2, 'F');
+        doc.setFontSize(6); doc.setFont('helvetica','bold'); st(90,90,90);
         doc.text(b.label, x + bW/2, 45.5, {align:'center'});
-        doc.setFontSize(10); doc.setFont('helvetica','bold'); st(0,0,0);
+        doc.setFontSize(10); doc.setFont('helvetica','bold'); st(...DARK);
         doc.text(`${b.sign} ${b.val}`, x + bW/2, 52, {align:'center'});
     });
 
@@ -7173,7 +7175,7 @@ exportCategoryToPDF(days, startDate, endDate) {
 
     const secHeader = (num, txt) => {
         checkPage(40);
-        sf(0,0,0); doc.rect(ML, y, CW, 7, 'F');
+        sf(...DARK); doc.rect(ML, y, CW, 7, 'F');
         doc.setFontSize(8); doc.setFont('helvetica','bold'); st(255,255,255);
         doc.text(`${num}   ${txt}`, ML+4, y+4.8);
         y += 8;
@@ -7183,13 +7185,13 @@ exportCategoryToPDF(days, startDate, endDate) {
 
     const itemRow = (label, val, pct, shade) => {
         checkPage();
-        if (shade) { sf(246,248,251); doc.rect(ML, y, CW, 6.5, 'F'); }
-        else       { sf(255,255,255); doc.rect(ML, y, CW, 6.5, 'F'); }
-        sd(220,225,232); doc.setLineWidth(0.1); doc.line(ML, y+6.5, MR, y+6.5);
-        doc.setFontSize(7.5); doc.setFont('helvetica','normal'); st(40,45,60);
+        shade ? sf(246,246,246) : sf(255,255,255);
+        doc.rect(ML, y, CW, 6.5, 'F');
+        sd(215,215,215); doc.setLineWidth(0.1); doc.line(ML, y+6.5, MR, y+6.5);
+        doc.setFontSize(7.5); doc.setFont('helvetica','normal'); st(50,50,50);
         doc.text(label, ML+4, y+4.4);
-        if (pct) { doc.setFontSize(7); st(130,140,160); doc.text(pct, PCT_COL, y+4.4, {align:'right'}); }
-        doc.setFontSize(7.5); doc.setFont('helvetica','bold'); st(40,45,60);
+        if (pct) { doc.setFontSize(7); st(130,130,130); doc.text(pct, PCT_COL, y+4.4, {align:'right'}); }
+        doc.setFontSize(7.5); doc.setFont('helvetica','bold'); st(50,50,50);
         doc.text(this.formatCurrency(val), MR, y+4.4, {align:'right'});
         y += 6.5;
     };
@@ -7198,7 +7200,7 @@ exportCategoryToPDF(days, startDate, endDate) {
         checkPage();
         sf(225,225,225); doc.rect(ML, y, CW, 8, 'F');
         sd(160,160,160); doc.setLineWidth(0.2); doc.rect(ML, y, CW, 8, 'S');
-        doc.setFontSize(8.5); doc.setFont('helvetica','bold'); st(0,0,0);
+        doc.setFontSize(8.5); doc.setFont('helvetica','bold'); st(...DARK);
         doc.text(label, ML+4, y+5.4);
         doc.text(this.formatCurrency(val), MR, y+5.4, {align:'right'});
         y += 9.5;
@@ -7231,34 +7233,51 @@ exportCategoryToPDF(days, startDate, endDate) {
     y += 6;
 
     // ── RESULTADO DO PERÍODO ──────────────────────────────────────────────────
-    checkPage(45);
-    sd(0,0,0); doc.setLineWidth(0.5);
+    checkPage(55);
+    sd(...DARK); doc.setLineWidth(0.5);
     doc.line(ML, y, MR, y);
     doc.setLineWidth(0.2);
     y += 5;
 
-    sf(0,0,0); doc.rect(ML, y, CW, 11, 'F');
+    sf(...DARK); doc.rect(ML, y, CW, 11, 'F');
     doc.setFontSize(10); doc.setFont('helvetica','bold'); st(255,255,255);
     doc.text('(=)   RESULTADO LÍQUIDO DO PERÍODO', ML+5, y+7);
-    st(255,255,255);
     doc.text(`${resultado>=0?'+ ':'- '}${this.formatCurrency(Math.abs(resultado))}`, MR, y+7, {align:'right'});
     y += 13;
 
     // ── SALDO FINAL DAS CONTAS ────────────────────────────────────────────────
     checkPage(20);
-    sf(240,240,240); doc.rect(ML, y, CW, 10, 'F');
-    sd(160,160,160); doc.setLineWidth(0.2); doc.rect(ML, y, CW, 10, 'S');
-    doc.setFontSize(8.5); doc.setFont('helvetica','bold'); st(0,0,0);
+    sf(238,238,238); doc.rect(ML, y, CW, 10, 'F');
+    sd(170,170,170); doc.setLineWidth(0.2); doc.rect(ML, y, CW, 10, 'S');
+    doc.setFontSize(8.5); doc.setFont('helvetica','bold'); st(...DARK);
     doc.text('SALDO FINAL DO PERÍODO (Total em Contas)', ML+4, y+6.5);
     doc.text(`${saldoFinal>=0?'+ ':'- '}${this.formatCurrency(Math.abs(saldoFinal))}`, MR, y+6.5, {align:'right'});
-    y += 11;
+    y += 13;
+
+    // ── OBSERVAÇÃO ───────────────────────────────────────────────────────────
+    if (observacao) {
+        checkPage(30);
+        sf(250,250,250); doc.rect(ML, y, CW, 6, 'F');
+        sd(...DARK); doc.setLineWidth(0.15); doc.rect(ML, y, CW, 6, 'S');
+        doc.setFontSize(7); doc.setFont('helvetica','bold'); st(...DARK);
+        doc.text('OBSERVAÇÕES:', ML+4, y+4);
+        y += 7;
+        const linhas = doc.splitTextToSize(observacao, CW - 8);
+        const altObs = linhas.length * 5 + 6;
+        checkPage(altObs + 5);
+        sf(252,252,252); doc.rect(ML, y, CW, altObs, 'F');
+        sd(200,200,200); doc.setLineWidth(0.1); doc.rect(ML, y, CW, altObs, 'S');
+        doc.setFontSize(8); doc.setFont('helvetica','normal'); st(50,50,50);
+        doc.text(linhas, ML+4, y+5);
+        y += altObs + 4;
+    }
 
     // ── RODAPÉ ────────────────────────────────────────────────────────────────
     const pages = doc.internal.getNumberOfPages();
     for (let p=1; p<=pages; p++) {
         doc.setPage(p);
-        sf(0,0,0); doc.rect(0, H-7, W, 7, 'F');
-        doc.setFontSize(6.5); doc.setFont('helvetica','normal'); st(200,200,200);
+        sf(...DARK); doc.rect(0, H-7, W, 7, 'F');
+        doc.setFontSize(6.5); doc.setFont('helvetica','normal'); st(210,210,210);
         doc.text('DOCUMENTO CONFIDENCIAL — USO INTERNO', ML, H-2.5);
         doc.text(`Página ${p} de ${pages}`, W/2, H-2.5, {align:'center'});
         doc.text(systemName, MR, H-2.5, {align:'right'});
