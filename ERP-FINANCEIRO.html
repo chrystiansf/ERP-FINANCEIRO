@@ -1495,7 +1495,7 @@
         .summary-item {
             text-align: center;
             padding: 15px;
-            background: white;
+            background: var(--bg-card);
             border-radius: 8px;
             border: 1px solid var(--border-color);
         }
@@ -3223,7 +3223,7 @@
                     const search = filters.search.toLowerCase();
                     result = result.filter(t => 
                         t.description.toLowerCase().includes(search) ||
-                        t.category.toLowerCase().includes(search)
+                        (t.category !== null && t.category !== undefined && String(t.category).toLowerCase().includes(search))
                     );
                 }
                 if (filters.days) {
@@ -3764,6 +3764,7 @@
                         this.loadDashboard();
                         break;
                     case 'transactions':
+                        this.populateMonthFilter();
                         this.loadTransactions();
                         break;
                     case 'accounts':
