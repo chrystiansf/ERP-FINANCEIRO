@@ -2702,6 +2702,9 @@
                 this.subcategories = JSON.parse(localStorage.getItem('subcategories')) || [];
                 this.ministries = JSON.parse(localStorage.getItem('ministries')) || [];
                 this.costcenters = JSON.parse(localStorage.getItem('costcenters')) || [];
+                // ── Migração: corrigir IDs duplicados de imports anteriores ──
+                this._fixDuplicateIds();
+
                 // Contador de IDs: garante unicidade mesmo em imports em lote
                 const allIds = [
                     ...this.accounts, ...this.transactions, ...this.deletedTransactions,
@@ -2713,6 +2716,55 @@
             }
 
             _uid() { return this._nextId++; }
+
+            // Corrige IDs duplicados já salvos no localStorage (causados pelo Date.now() em loop)
+            _fixDuplicateIds() {
+                let changed = false;
+                // Usa um contador temporário baseado no maior ID existente
+                const allExisting = [
+                    ...this.transactions, ...this.deletedTransactions,
+                    ...this.accounts, ...this.suppliers, ...this.customers,
+                    ...this.categories, ...this.ministries, ...this.costcenters
+                ].map(r => Number(r.id) || 0);
+                let counter = (allExisting.length ? Math.max(...allExisting) : 0) + 1;
+
+                // Para cada coleção que pode ter duplicatas, reatribuir IDs duplicados
+                const fixCollection = (collection) => {
+                    const seen = new Set();
+                    collection.forEach(item => {
+                        const id = Number(item.id);
+                        if (seen.has(id) || !id) {
+                            // ID duplicado ou inválido — atribui um novo
+                            item.id = counter++;
+                            changed = true;
+                        } else {
+                            seen.add(id);
+                        }
+                    });
+                };
+
+                fixCollection(this.transactions);
+                fixCollection(this.deletedTransactions);
+                fixCollection(this.accounts);
+                fixCollection(this.suppliers);
+                fixCollection(this.customers);
+                fixCollection(this.categories);
+                fixCollection(this.ministries);
+                fixCollection(this.costcenters);
+
+                if (changed) {
+                    // Salvar imediatamente para que a correção persista
+                    localStorage.setItem('transactions',        JSON.stringify(this.transactions));
+                    localStorage.setItem('deletedTransactions', JSON.stringify(this.deletedTransactions));
+                    localStorage.setItem('accounts',            JSON.stringify(this.accounts));
+                    localStorage.setItem('suppliers',           JSON.stringify(this.suppliers));
+                    localStorage.setItem('customers',           JSON.stringify(this.customers));
+                    localStorage.setItem('categories',          JSON.stringify(this.categories));
+                    localStorage.setItem('ministries',          JSON.stringify(this.ministries));
+                    localStorage.setItem('costcenters',         JSON.stringify(this.costcenters));
+                    console.log('[DB] IDs duplicados corrigidos e salvos.');
+                }
+            }
 
             init() {
                 if (this.accounts.length === 0) {
