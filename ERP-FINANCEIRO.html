@@ -2324,6 +2324,10 @@
                             <canvas id="comp-chart" style="width:100%;max-height:260px;margin-bottom:12px;"></canvas>
                             <div id="comp-table-wrap" style="overflow-x:auto;"></div>
                         </div>
+                        <div style="margin: 10px 0 15px; text-align: left;">
+                            <label style="font-size:0.82rem;font-weight:600;color:var(--text-secondary);display:block;margin-bottom:4px;text-align:left;">Observação (opcional):</label>
+                            <textarea id="comp-observacao" rows="3" placeholder="Notas ou observações para o relatório comparativo..." style="display:block;width:100%;padding:7px 9px;border:1.5px solid var(--border-color);border-radius:6px;background:var(--bg-input);color:var(--text-primary);font-family:inherit;font-size:0.82rem;resize:vertical;box-sizing:border-box;text-align:left;direction:ltr;"></textarea>
+                        </div>
                         <div style="display:flex;gap:8px;flex-wrap:wrap;">
                             <button class="btn btn-secondary" onclick="app.showComparativo()" style="flex:1;">
                                 <i class="fas fa-eye"></i> Visualizar
@@ -7447,6 +7451,12 @@ exportComparativoPDF() {
     if (this._compSelectedMonths.length === 0) {
         this.showNotification('Adicione pelo menos um mês antes de exportar.', 'warning'); return;
     }
+    // Garante que o gráfico esteja visível para captura
+    const preview = document.getElementById('comp-preview');
+    const wasHidden = preview.style.display === 'none';
+    if (wasHidden) this.showComparativo();
+
+    const observacao = (document.getElementById('comp-observacao')?.value || '').trim();
     const data       = this._compCalcData();
     const { jsPDF }  = window.jspdf;
     const doc        = new jsPDF('portrait','mm','a4');
@@ -7477,12 +7487,11 @@ exportComparativoPDF() {
     doc.text(`Emissão: ${new Date().toLocaleDateString('pt-BR')}`, textX, 25.5);
     sd(...DARK); doc.setLineWidth(0.5); doc.line(0,31.5,W,31.5); doc.setLineWidth(0.2);
 
-    // Tabela
     let y = 38;
     const colW = [30, CW/4+5, CW/4+5, CW/4+5];
     const cols = [ML, ML+colW[0], ML+colW[0]+colW[1], ML+colW[0]+colW[1]+colW[2]];
 
-    // Header tabela
+    // ── TABELA ────────────────────────────────────────────────────────────────
     sf(...DARK); doc.rect(ML, y, CW, 8, 'F');
     doc.setFontSize(7.5); doc.setFont('helvetica','bold'); st(255,255,255);
     ['MÊS','ENTRADAS','SAÍDAS','RESULTADO'].forEach((h,i) => {
@@ -7507,8 +7516,9 @@ exportComparativoPDF() {
         y += 8;
     });
 
-    // Totais gerais
+    // Totais
     y += 4;
+    if (y > H-25) { doc.addPage(); y=15; }
     const totRec  = data.reduce((s,d)=>s+d.receitas,0);
     const totDesp = data.reduce((s,d)=>s+d.despesas,0);
     const totRes  = data.reduce((s,d)=>s+d.resultado,0);
@@ -7518,8 +7528,41 @@ exportComparativoPDF() {
     doc.text(`+ ${this.formatCurrency(totRec)}`,  cols[1]+colW[1]/2, y+6, {align:'center'});
     doc.text(`- ${this.formatCurrency(totDesp)}`, cols[2]+colW[2]/2, y+6, {align:'center'});
     doc.text(`${totRes>=0?'+ ':'- '}${this.formatCurrency(Math.abs(totRes))}`, cols[3]+colW[3]/2, y+6, {align:'center'});
+    y += 13;
 
-    // Rodapé
+    // ── GRÁFICO (captura do canvas) ───────────────────────────────────────────
+    const canvas = document.getElementById('comp-chart');
+    if (canvas && this._compChartInst) {
+        try {
+            const imgData   = canvas.toDataURL('image/png');
+            const chartH    = 75; // mm
+            if (y + chartH > H - 15) { doc.addPage(); y = 15; }
+            sf(250,250,250); doc.rect(ML, y, CW, chartH, 'F');
+            sd(215,215,215); doc.setLineWidth(0.15); doc.rect(ML, y, CW, chartH, 'S');
+            doc.addImage(imgData, 'PNG', ML+2, y+2, CW-4, chartH-4);
+            y += chartH + 6;
+        } catch(e) {}
+    }
+
+    // ── OBSERVAÇÃO ────────────────────────────────────────────────────────────
+    if (observacao) {
+        if (y > H-30) { doc.addPage(); y=15; }
+        sf(250,250,250); doc.rect(ML, y, CW, 6, 'F');
+        sd(...DARK); doc.setLineWidth(0.15); doc.rect(ML, y, CW, 6, 'S');
+        doc.setFontSize(7); doc.setFont('helvetica','bold'); st(...DARK);
+        doc.text('OBSERVAÇÕES:', ML+4, y+4);
+        y += 7;
+        const linhas  = doc.splitTextToSize(observacao, CW - 8);
+        const altObs  = linhas.length * 5 + 6;
+        if (y + altObs > H-15) { doc.addPage(); y=15; }
+        sf(252,252,252); doc.rect(ML, y, CW, altObs, 'F');
+        sd(200,200,200); doc.setLineWidth(0.1); doc.rect(ML, y, CW, altObs, 'S');
+        doc.setFontSize(8); doc.setFont('helvetica','normal'); st(50,50,50);
+        doc.text(linhas, ML+4, y+5);
+        y += altObs + 4;
+    }
+
+    // ── RODAPÉ ────────────────────────────────────────────────────────────────
     const pages = doc.internal.getNumberOfPages();
     for (let p=1;p<=pages;p++) {
         doc.setPage(p);
