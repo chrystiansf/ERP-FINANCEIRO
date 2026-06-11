@@ -7150,9 +7150,16 @@ exportCategoryToPDF(days, startDate, endDate, observacao = '') {
     const totalDesp = Object.values(despesas).reduce((s,v)=>s+v, 0);
     const resultado = totalRec - totalDesp;
 
-    // Saldo final: soma dos saldos de todas as contas
-    const allAccounts = this.db.getAccounts ? this.db.getAccounts() : (this.db.accounts || []);
-    const saldoFinal  = allAccounts.reduce((s, a) => s + (parseFloat(a.current_balance) || 0), 0);
+    // Saldo da conta bancária ao final do período do relatório:
+    // Parte do saldo atual e reverte as transações reconciliadas posteriores à data final.
+    const allAccounts   = this.db.getAccounts ? this.db.getAccounts() : (this.db.accounts || []);
+    const saldoAtual    = allAccounts.reduce((s, a) => s + (parseFloat(a.current_balance) || 0), 0);
+    const todasTrans    = this.db.getTransactions({});
+    const transPostPeriodo = todasTrans.filter(t => t.reconciled && t.date > endDate);
+    const ajuste = transPostPeriodo.reduce((s, t) => {
+        return s + (t.type === 'income' ? -t.amount : t.amount);
+    }, 0);
+    const saldoFinal = saldoAtual + ajuste;
 
     const systemName  = localStorage.getItem('systemName') || 'ERP Financeiro';
     const logoData    = this.getCompanyLogo();
