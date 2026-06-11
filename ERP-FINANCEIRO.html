@@ -2296,6 +2296,44 @@
                         </button>
                     </div>
 
+                    <!-- RELATÓRIO COMPARATIVO -->
+                    <div class="report-card" style="grid-column: 1 / -1;">
+                        <div class="report-icon" style="background: linear-gradient(135deg,rgba(16,185,129,0.12),rgba(59,130,246,0.12));">
+                            <i class="fas fa-chart-bar" style="color:var(--success);"></i>
+                        </div>
+                        <h3>Comparativo Mensal</h3>
+                        <p>Compare entradas, saídas e resultado de múltiplos meses lado a lado</p>
+                        <div style="text-align:left; margin: 12px 0;">
+                            <label style="font-size:0.82rem;font-weight:600;color:var(--text-secondary);display:block;margin-bottom:6px;">Selecione os meses para comparar:</label>
+                            <div id="comp-months-container" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;"></div>
+                            <div style="display:flex;gap:8px;margin-bottom:10px;">
+                                <select id="comp-add-year" style="padding:5px 8px;border:1px solid var(--border-color);border-radius:6px;background:var(--bg-input);color:var(--text-primary);font-size:0.82rem;flex:1;"></select>
+                                <select id="comp-add-month" style="padding:5px 8px;border:1px solid var(--border-color);border-radius:6px;background:var(--bg-input);color:var(--text-primary);font-size:0.82rem;flex:2;">
+                                    <option value="01">Janeiro</option><option value="02">Fevereiro</option><option value="03">Março</option>
+                                    <option value="04">Abril</option><option value="05">Maio</option><option value="06">Junho</option>
+                                    <option value="07">Julho</option><option value="08">Agosto</option><option value="09">Setembro</option>
+                                    <option value="10">Outubro</option><option value="11">Novembro</option><option value="12">Dezembro</option>
+                                </select>
+                                <button onclick="app.compAddMonth()" class="btn btn-primary" style="padding:5px 12px;font-size:0.82rem;white-space:nowrap;">
+                                    <i class="fas fa-plus"></i> Adicionar
+                                </button>
+                            </div>
+                        </div>
+                        <!-- Preview inline -->
+                        <div id="comp-preview" style="display:none; text-align:left; margin-bottom:12px;">
+                            <canvas id="comp-chart" style="width:100%;max-height:260px;margin-bottom:12px;"></canvas>
+                            <div id="comp-table-wrap" style="overflow-x:auto;"></div>
+                        </div>
+                        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                            <button class="btn btn-secondary" onclick="app.showComparativo()" style="flex:1;">
+                                <i class="fas fa-eye"></i> Visualizar
+                            </button>
+                            <button class="btn btn-secondary" onclick="app.exportComparativoPDF()" style="flex:1;">
+                                <i class="fas fa-file-pdf"></i> Exportar PDF
+                            </button>
+                        </div>
+                    </div>
+
                 </div>
             </div>
         </main>
@@ -3795,6 +3833,9 @@
                         break;
                     case 'reconciliation':
                         this.loadReconciliation();
+                        break;
+                    case 'reports':
+                        this._compInitYears();
                         break;
                     case 'deleted':
                         this.loadDeleted();
@@ -7285,6 +7326,212 @@ exportCategoryToPDF(days, startDate, endDate, observacao = '') {
 
     doc.save(`DRE_${periodText.replace(/\s/g,'_').replace(/\//g,'-')}.pdf`);
     this.showNotification('✅ DRE gerada com sucesso!', 'success');
+}
+
+// ===== RELATÓRIO COMPARATIVO MENSAL =====
+
+_compSelectedMonths = [];
+
+_compInitYears() {
+    const sel = document.getElementById('comp-add-year');
+    if (!sel || sel.options.length > 0) return;
+    const now = new Date();
+    for (let y = now.getFullYear(); y >= now.getFullYear() - 5; y--) {
+        const o = document.createElement('option');
+        o.value = y; o.textContent = y;
+        sel.appendChild(o);
+    }
+    // pré-selecionar mês atual
+    const moSel = document.getElementById('comp-add-month');
+    if (moSel) moSel.value = String(now.getMonth() + 1).padStart(2,'0');
+}
+
+compAddMonth() {
+    this._compInitYears();
+    const yr  = document.getElementById('comp-add-year')?.value;
+    const mo  = document.getElementById('comp-add-month')?.value;
+    if (!yr || !mo) return;
+    const key = `${yr}-${mo}`;
+    if (this._compSelectedMonths.includes(key)) {
+        this.showNotification('Mês já adicionado.', 'warning'); return;
+    }
+    this._compSelectedMonths.push(key);
+    this._renderCompTags();
+}
+
+_renderCompTags() {
+    const container = document.getElementById('comp-months-container');
+    if (!container) return;
+    const months = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+    container.innerHTML = this._compSelectedMonths.map(k => {
+        const [y,m] = k.split('-');
+        return `<span style="display:inline-flex;align-items:center;gap:4px;background:var(--primary-light);color:var(--primary);border:1px solid var(--primary);border-radius:20px;padding:3px 10px;font-size:0.78rem;font-weight:600;">
+            ${months[parseInt(m)-1]}/${y}
+            <i class="fas fa-times" style="cursor:pointer;font-size:0.7rem;" onclick="app._compRemoveMonth('${k}')"></i>
+        </span>`;
+    }).join('');
+}
+
+_compRemoveMonth(key) {
+    this._compSelectedMonths = this._compSelectedMonths.filter(k => k !== key);
+    this._renderCompTags();
+    document.getElementById('comp-preview').style.display = 'none';
+}
+
+_compCalcData() {
+    const months = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+    return this._compSelectedMonths.map(key => {
+        const [y,m] = key.split('-');
+        const all = this.db.getTransactions({}).filter(t => t.date && t.date.startsWith(key));
+        const receitas = all.filter(t => t.type==='income').reduce((s,t)=>s+t.amount,0);
+        const despesas = all.filter(t => t.type==='expense').reduce((s,t)=>s+t.amount,0);
+        return { key, label: `${months[parseInt(m)-1]}/${y}`, receitas, despesas, resultado: receitas - despesas };
+    });
+}
+
+showComparativo() {
+    this._compInitYears();
+    if (this._compSelectedMonths.length === 0) {
+        this.showNotification('Adicione pelo menos um mês para visualizar.', 'warning'); return;
+    }
+    const data = this._compCalcData();
+    const preview = document.getElementById('comp-preview');
+    preview.style.display = 'block';
+
+    // Tabela
+    const wrap = document.getElementById('comp-table-wrap');
+    wrap.innerHTML = `<table style="width:100%;border-collapse:collapse;font-size:0.82rem;">
+        <thead>
+            <tr style="background:var(--bg-hover);">
+                <th style="padding:7px 10px;text-align:left;border:1px solid var(--border-color);font-weight:700;color:var(--text-secondary);font-size:0.72rem;text-transform:uppercase;">Mês</th>
+                <th style="padding:7px 10px;text-align:right;border:1px solid var(--border-color);font-weight:700;color:var(--success);font-size:0.72rem;text-transform:uppercase;">Entradas</th>
+                <th style="padding:7px 10px;text-align:right;border:1px solid var(--border-color);font-weight:700;color:var(--danger);font-size:0.72rem;text-transform:uppercase;">Saídas</th>
+                <th style="padding:7px 10px;text-align:right;border:1px solid var(--border-color);font-weight:700;color:var(--text-primary);font-size:0.72rem;text-transform:uppercase;">Resultado</th>
+            </tr>
+        </thead>
+        <tbody>
+            ${data.map((d,i) => `<tr style="background:${i%2===0?'var(--bg-card)':'var(--bg-hover)'};">
+                <td style="padding:7px 10px;border:1px solid var(--border-color);font-weight:600;">${d.label}</td>
+                <td style="padding:7px 10px;border:1px solid var(--border-color);text-align:right;color:var(--success);font-weight:600;">+ ${this.formatCurrency(d.receitas)}</td>
+                <td style="padding:7px 10px;border:1px solid var(--border-color);text-align:right;color:var(--danger);font-weight:600;">- ${this.formatCurrency(d.despesas)}</td>
+                <td style="padding:7px 10px;border:1px solid var(--border-color);text-align:right;font-weight:700;color:${d.resultado>=0?'var(--success)':'var(--danger)'};">${d.resultado>=0?'+ ':'- '}${this.formatCurrency(Math.abs(d.resultado))}</td>
+            </tr>`).join('')}
+        </tbody>
+    </table>`;
+
+    // Gráfico
+    const canvas = document.getElementById('comp-chart');
+    if (this._compChartInst) { this._compChartInst.destroy(); this._compChartInst = null; }
+    this._compChartInst = new Chart(canvas, {
+        type: 'bar',
+        data: {
+            labels: data.map(d => d.label),
+            datasets: [
+                { label: 'Entradas', data: data.map(d => d.receitas),  backgroundColor: 'rgba(16,185,129,0.75)', borderColor: '#10B981', borderWidth: 1.5, borderRadius: 4 },
+                { label: 'Saídas',   data: data.map(d => d.despesas),  backgroundColor: 'rgba(239,68,68,0.75)',  borderColor: '#EF4444', borderWidth: 1.5, borderRadius: 4 },
+                { label: 'Resultado',data: data.map(d => d.resultado), backgroundColor: data.map(d=>d.resultado>=0?'rgba(59,130,246,0.75)':'rgba(245,158,11,0.75)'), borderColor: data.map(d=>d.resultado>=0?'#3B82F6':'#F59E0B'), borderWidth: 1.5, borderRadius: 4 },
+            ]
+        },
+        options: {
+            responsive: true,
+            plugins: { legend: { position:'top', labels:{ font:{size:11}, boxWidth:12 } } },
+            scales: {
+                y: { ticks:{ callback: v => 'R$ '+v.toLocaleString('pt-BR',{minimumFractionDigits:0}) }, grid:{ color:'rgba(0,0,0,0.06)' } },
+                x: { grid:{ display:false } }
+            }
+        }
+    });
+}
+
+exportComparativoPDF() {
+    if (this._compSelectedMonths.length === 0) {
+        this.showNotification('Adicione pelo menos um mês antes de exportar.', 'warning'); return;
+    }
+    const data       = this._compCalcData();
+    const { jsPDF }  = window.jspdf;
+    const doc        = new jsPDF('portrait','mm','a4');
+    const systemName = localStorage.getItem('systemName') || 'ERP Financeiro';
+    const logoData   = this.getCompanyLogo();
+    const DARK       = [60,60,60];
+    const W=210, H=297, ML=20, MR=190, CW=170;
+    const sf=(r,g,b)=>doc.setFillColor(r,g,b);
+    const st=(r,g,b)=>doc.setTextColor(r,g,b);
+    const sd=(r,g,b)=>doc.setDrawColor(r,g,b);
+
+    // Cabeçalho
+    sf(...DARK); doc.rect(0,0,W,1.5,'F');
+    sf(255,255,255); doc.rect(0,1.5,W,30,'F');
+    let textX = ML;
+    if (logoData) {
+        try {
+            const ext = logoData.startsWith('data:image/png')?'PNG':'JPEG';
+            doc.addImage(logoData, ext, ML, 3, 36, 25);
+            textX = ML + 40;
+        } catch(e) {}
+    }
+    doc.setFontSize(7); doc.setFont('helvetica','normal'); st(110,110,110);
+    doc.text(systemName.toUpperCase(), textX, 11);
+    doc.setFontSize(13); doc.setFont('helvetica','bold'); st(...DARK);
+    doc.text('RELATÓRIO COMPARATIVO MENSAL', textX, 19);
+    doc.setFontSize(7.5); doc.setFont('helvetica','normal'); st(100,100,100);
+    doc.text(`Emissão: ${new Date().toLocaleDateString('pt-BR')}`, textX, 25.5);
+    sd(...DARK); doc.setLineWidth(0.5); doc.line(0,31.5,W,31.5); doc.setLineWidth(0.2);
+
+    // Tabela
+    let y = 38;
+    const colW = [30, CW/4+5, CW/4+5, CW/4+5];
+    const cols = [ML, ML+colW[0], ML+colW[0]+colW[1], ML+colW[0]+colW[1]+colW[2]];
+
+    // Header tabela
+    sf(...DARK); doc.rect(ML, y, CW, 8, 'F');
+    doc.setFontSize(7.5); doc.setFont('helvetica','bold'); st(255,255,255);
+    ['MÊS','ENTRADAS','SAÍDAS','RESULTADO'].forEach((h,i) => {
+        doc.text(h, cols[i] + (i===0?2:colW[i]/2), y+5.2, {align: i===0?'left':'center'});
+    });
+    y += 9;
+
+    data.forEach((d, idx) => {
+        if (y > H-30) { doc.addPage(); y=15; }
+        idx%2===0 ? sf(246,246,246) : sf(255,255,255);
+        doc.rect(ML, y, CW, 8, 'F');
+        sd(210,210,210); doc.setLineWidth(0.1); doc.rect(ML, y, CW, 8, 'S');
+        doc.setFontSize(8); doc.setFont('helvetica','bold'); st(...DARK);
+        doc.text(d.label, cols[0]+2, y+5.2);
+        doc.setFont('helvetica','normal'); st(30,120,60);
+        doc.text(`+ ${this.formatCurrency(d.receitas)}`, cols[1]+colW[1]/2, y+5.2, {align:'center'});
+        st(180,30,30);
+        doc.text(`- ${this.formatCurrency(d.despesas)}`, cols[2]+colW[2]/2, y+5.2, {align:'center'});
+        d.resultado>=0 ? st(30,100,50) : st(180,30,30);
+        doc.setFont('helvetica','bold');
+        doc.text(`${d.resultado>=0?'+ ':'- '}${this.formatCurrency(Math.abs(d.resultado))}`, cols[3]+colW[3]/2, y+5.2, {align:'center'});
+        y += 8;
+    });
+
+    // Totais gerais
+    y += 4;
+    const totRec  = data.reduce((s,d)=>s+d.receitas,0);
+    const totDesp = data.reduce((s,d)=>s+d.despesas,0);
+    const totRes  = data.reduce((s,d)=>s+d.resultado,0);
+    sf(...DARK); doc.rect(ML, y, CW, 9, 'F');
+    doc.setFontSize(8.5); doc.setFont('helvetica','bold'); st(255,255,255);
+    doc.text('TOTAL DO PERÍODO', cols[0]+2, y+6);
+    doc.text(`+ ${this.formatCurrency(totRec)}`,  cols[1]+colW[1]/2, y+6, {align:'center'});
+    doc.text(`- ${this.formatCurrency(totDesp)}`, cols[2]+colW[2]/2, y+6, {align:'center'});
+    doc.text(`${totRes>=0?'+ ':'- '}${this.formatCurrency(Math.abs(totRes))}`, cols[3]+colW[3]/2, y+6, {align:'center'});
+
+    // Rodapé
+    const pages = doc.internal.getNumberOfPages();
+    for (let p=1;p<=pages;p++) {
+        doc.setPage(p);
+        sf(...DARK); doc.rect(0,H-7,W,7,'F');
+        doc.setFontSize(6.5); doc.setFont('helvetica','normal'); st(210,210,210);
+        doc.text('DOCUMENTO CONFIDENCIAL — USO INTERNO', ML, H-2.5);
+        doc.text(`Página ${p} de ${pages}`, W/2, H-2.5, {align:'center'});
+        doc.text(systemName, MR, H-2.5, {align:'right'});
+    }
+
+    doc.save(`Comparativo_Mensal_${new Date().toISOString().split('T')[0]}.pdf`);
+    this.showNotification('✅ Comparativo exportado com sucesso!', 'success');
 }
 
 exportCategoryToExcel(days, startDate, endDate) {
