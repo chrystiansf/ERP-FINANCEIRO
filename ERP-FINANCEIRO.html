@@ -1684,6 +1684,10 @@
                             <i class="fas fa-trash"></i>
                             Excluir Selecionadas (<span id="selected-count">0</span>)
                         </button>
+                        <button class="btn btn-success" id="bulk-reconcile-transactions-btn" style="display: none; background: #10B981; border: none;">
+                            <i class="fas fa-check-double"></i>
+                            Conciliar Selecionadas (<span id="bulk-reconcile-transactions-count">0</span>)
+                        </button>
                         <button class="btn btn-secondary" id="import-btn">
                             <i class="fas fa-file-import"></i>
                             Importar Extrato
@@ -4872,18 +4876,43 @@
                         this.deleteSelectedTransactions();
                     });
                 }
+
+                // Botão de conciliar selecionadas (aba Transações)
+                const bulkReconcileBtn = document.getElementById('bulk-reconcile-transactions-btn');
+                if (bulkReconcileBtn) {
+                    bulkReconcileBtn.addEventListener('click', () => {
+                        this.bulkReconcileFromTransactions();
+                    });
+                }
             }
 
-            // NOVA FUNÇÃO: Atualizar botão de exclusão
+            // Atualizar botões de ação em lote (excluir + conciliar)
             updateBulkDeleteButton() {
-                const deleteBtn = document.getElementById('delete-selected-btn');
-                const countSpan = document.getElementById('selected-count');
-                
-                if (this.selectedTransactions.size > 0) {
+                const deleteBtn        = document.getElementById('delete-selected-btn');
+                const reconcileBtn     = document.getElementById('bulk-reconcile-transactions-btn');
+                const countSpan        = document.getElementById('selected-count');
+                const reconcileCount   = document.getElementById('bulk-reconcile-transactions-count');
+
+                const total = this.selectedTransactions.size;
+
+                if (total > 0) {
                     deleteBtn.style.display = 'inline-flex';
-                    countSpan.textContent = this.selectedTransactions.size;
+                    countSpan.textContent   = total;
                 } else {
                     deleteBtn.style.display = 'none';
+                }
+
+                // Contar quantas das selecionadas ainda não estão conciliadas
+                const pendingSelected = Array.from(this.selectedTransactions).filter(id => {
+                    const t = this.db.transactions.find(t => t.id === id);
+                    return t && !t.reconciled;
+                }).length;
+
+                if (pendingSelected > 0) {
+                    reconcileBtn.style.display  = 'inline-flex';
+                    reconcileCount.textContent  = pendingSelected;
+                } else {
+                    reconcileBtn.style.display  = 'none';
                 }
             }
 
@@ -4912,9 +4941,63 @@
                     if (selectAllCheckbox) {
                         selectAllCheckbox.checked = false;
                     }
-                    
+
                     this.updateBulkDeleteButton();
                 }
+            }
+
+            // Conciliar em lote direto da aba Transações
+            bulkReconcileFromTransactions() {
+                const ids = Array.from(this.selectedTransactions).filter(id => {
+                    const t = this.db.transactions.find(t => t.id === id);
+                    return t && !t.reconciled;
+                });
+
+                if (ids.length === 0) {
+                    this.showNotification('Nenhuma transação pendente selecionada', 'error');
+                    return;
+                }
+
+                if (!confirm(`Conciliar ${ids.length} transação(ões) selecionada(s)?`)) return;
+
+                const accountDeltas = {};
+                let ok = 0, errors = 0;
+
+                ids.forEach(id => {
+                    const t = this.db.transactions.find(t => t.id === id);
+                    if (!t) { errors++; return; }
+
+                    const accountId = parseInt(t.account);
+                    if (!accountId || isNaN(accountId)) { errors++; return; }
+                    if (!this.db.getAccount(accountId)) { errors++; return; }
+
+                    t.reconciled = true;
+                    t.status     = 'reconciled';
+                    const delta  = parseFloat(t.amount) * (t.type === 'income' ? 1 : -1);
+                    accountDeltas[accountId] = (accountDeltas[accountId] || 0) + delta;
+                    ok++;
+                });
+
+                Object.entries(accountDeltas).forEach(([accId, delta]) => {
+                    const account = this.db.getAccount(parseInt(accId));
+                    if (account) account.current_balance = (parseFloat(account.current_balance) || 0) + delta;
+                });
+
+                this.db.save();
+                this.selectedTransactions.clear();
+                const selectAll = document.getElementById('select-all-transactions');
+                if (selectAll) selectAll.checked = false;
+
+                if (errors > 0) {
+                    this.showNotification(`✅ ${ok} conciliada(s). ⚠️ ${errors} sem conta bancária.`, 'warning');
+                } else {
+                    this.showNotification(`✅ ${ok} transação(ões) conciliada(s) com sucesso!`, 'success');
+                }
+
+                this.updateBulkDeleteButton();
+                this.loadTransactions();
+                this.loadDashboard();
+                this.loadAccounts();
             }
 
             loadDashboard() {
@@ -6272,8 +6355,8 @@
                             </thead>
                             <tbody>
                                 ${pending.map(t => {
-                                    const category = this.db.getCategory(t.category);
-                                    const categoryName = category ? category.name : (t.category || 'Sem categoria');
+                                    const category = this.db.getCategory(parseInt(t.category));
+                                    const categoryName = category ? category.name : (t.category ? 'Sem categoria' : 'Sem categoria');
                                     
                                     return `
                                     <tr>
