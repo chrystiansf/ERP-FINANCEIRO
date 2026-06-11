@@ -1202,6 +1202,59 @@
             }
         }
 
+        /* ===== EDIÇÃO INLINE DE TRANSAÇÕES ===== */
+        td.editable-cell {
+            cursor: pointer;
+            position: relative;
+        }
+        td.editable-cell:hover .cell-display {
+            background: var(--primary-light);
+            border-radius: 4px;
+            outline: 1px dashed var(--primary);
+        }
+        td.editable-cell .cell-display {
+            display: inline-block;
+            width: 100%;
+            padding: 2px 4px;
+            min-height: 22px;
+        }
+        .cell-edit-wrap {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .cell-edit-wrap input,
+        .cell-edit-wrap select {
+            flex: 1;
+            padding: 3px 6px;
+            border: 2px solid var(--primary);
+            border-radius: 4px;
+            font-size: 0.875rem;
+            background: var(--bg-input);
+            color: var(--text-primary);
+            min-width: 80px;
+        }
+        .cell-edit-wrap input:focus,
+        .cell-edit-wrap select:focus {
+            outline: none;
+        }
+        .cell-confirm-btn, .cell-cancel-btn {
+            width: 24px;
+            height: 24px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.75rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+        .cell-confirm-btn { background: var(--success); color: white; }
+        .cell-cancel-btn  { background: var(--danger);  color: white; }
+        .cell-confirm-btn:hover { background: #059669; }
+        .cell-cancel-btn:hover  { background: #dc2626; }
+
         /* ===== MODAL PREVIEW IMPORTAÇÃO ===== */
         #import-preview-modal .modal-content {
             max-width: 95vw;
@@ -5112,18 +5165,16 @@
                 tbody.innerHTML = transactions.map(t => {
                     const account = this.db.getAccount(t.account);
                     const isSelected = this.selectedTransactions.has(t.id);
-                    
-                    // Buscar nomes
-                    const category = this.db.getCategory(parseInt(t.category));
+
+                    const category   = this.db.getCategory(parseInt(t.category));
                     const categoryName = category ? category.name : (t.category || '-');
-                    
-                    const ministry = this.db.getMinistry(parseInt(t.ministry));
+
+                    const ministry   = this.db.getMinistry(parseInt(t.ministry));
                     const ministryName = ministry ? ministry.name : (t.ministry || '-');
-                    
+
                     const costcenter = this.db.getCostCenter(parseInt(t.costcenter));
                     const costcenterName = costcenter ? costcenter.name : (t.costcenter || '-');
-                    
-                    // Buscar nome do cliente ou fornecedor
+
                     let clientSupplierName = '-';
                     if (t.type === 'income' && t.customer) {
                         const customer = this.db.customers.find(c => c.id == t.customer || c.name === t.customer);
@@ -5132,18 +5183,23 @@
                         const supplier = this.db.suppliers.find(s => s.id == t.supplier || s.name === t.supplier);
                         clientSupplierName = supplier ? supplier.name : t.supplier;
                     }
-                    
+
+                    // Dica visual: célula editável exibe tooltip no hover
+                    const ec = (field, display) =>
+                        `<td class="editable-cell" title="Clique para editar" onclick="app.inlineEdit(event,${t.id},'${field}')">` +
+                        `<span class="cell-display">${display}</span></td>`;
+
                     return `
-                        <tr>
+                        <tr data-id="${t.id}">
                             <td>
-                                <input type="checkbox" 
-                                       class="transaction-checkbox" 
-                                       data-id="${t.id}" 
+                                <input type="checkbox"
+                                       class="transaction-checkbox"
+                                       data-id="${t.id}"
                                        ${isSelected ? 'checked' : ''}
                                        onchange="app.toggleTransactionSelection(${t.id}, this.checked)">
                             </td>
-                            <td>${this.formatDate(t.date)}</td>
-                            <td>${t.description}</td>
+                            ${ec('date',        this.formatDate(t.date))}
+                            ${ec('description', this._escapeHtml(t.description))}
                             <td>
                                 <span class="amount ${t.type}">
                                     ${t.type === 'income' ? '+' : '-'} ${this.formatCurrency(t.amount)}
@@ -5151,10 +5207,10 @@
                             </td>
                             <td>${account?.name || 'N/A'}</td>
                             <td>${clientSupplierName}</td>
-                            <td>${categoryName}</td>
+                            ${ec('category', categoryName)}
                             <td>${ministryName}</td>
                             <td>${costcenterName}</td>
-                            <td style="max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${t.notes || ''}">${t.notes || '-'}</td>
+                            ${ec('notes', `<span style="max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:inline-block;" title="${this._escapeHtml(t.notes||'')}">${this._escapeHtml(t.notes||'-')}</span>`)}
                             <td>
                                 <span class="status-badge ${t.reconciled ? 'reconciled' : 'pending'}">
                                     ${t.reconciled ? 'Conciliada' : 'Pendente'}
@@ -5162,7 +5218,7 @@
                             </td>
                             <td>
                                 <div class="action-buttons">
-                                    <button class="btn-action" onclick="app.editTransaction(${t.id})" title="Editar">
+                                    <button class="btn-action" onclick="app.editTransaction(${t.id})" title="Editar completo">
                                         <i class="fas fa-edit"></i>
                                     </button>
                                     ${!t.reconciled ? `
@@ -5206,6 +5262,117 @@
                     balanceEl.textContent = `${balance >= 0 ? '+' : ''}${this.formatCurrency(balance)}`;
                     balanceEl.style.color = balance >= 0 ? 'var(--success)' : 'var(--danger)';
                 }
+            }
+
+            // ── Edição inline de células da tabela de transações ──────────────
+            inlineEdit(event, id, field) {
+                // Evitar abrir edição ao clicar em botões filhos
+                if (event.target.closest('button, input')) return;
+
+                const td = event.currentTarget;
+                // Se já está em modo edição, ignorar
+                if (td.querySelector('.cell-edit-wrap')) return;
+
+                const transaction = this.db.transactions.find(t => t.id === id);
+                if (!transaction) return;
+
+                const display = td.querySelector('.cell-display');
+                const originalHTML = display.innerHTML;
+                let inputEl;
+
+                // Montar o controle adequado para cada campo
+                if (field === 'description' || field === 'notes') {
+                    inputEl = document.createElement('input');
+                    inputEl.type = 'text';
+                    inputEl.value = field === 'description' ? transaction.description : (transaction.notes || '');
+
+                } else if (field === 'date') {
+                    inputEl = document.createElement('input');
+                    inputEl.type = 'date';
+                    inputEl.value = transaction.date;
+
+                } else if (field === 'category') {
+                    inputEl = document.createElement('select');
+                    inputEl.innerHTML = '<option value="">— Sem categoria —</option>' +
+                        this.db.categories.map(c =>
+                            `<option value="${c.id}" ${String(transaction.category) === String(c.id) ? 'selected' : ''}>${c.name}</option>`
+                        ).join('');
+
+                } else {
+                    return; // campo não editável inline
+                }
+
+                const confirmBtn = document.createElement('button');
+                confirmBtn.className = 'cell-confirm-btn';
+                confirmBtn.title = 'Salvar (Enter)';
+                confirmBtn.innerHTML = '<i class="fas fa-check"></i>';
+
+                const cancelBtn = document.createElement('button');
+                cancelBtn.className = 'cell-cancel-btn';
+                cancelBtn.title = 'Cancelar (Esc)';
+                cancelBtn.innerHTML = '<i class="fas fa-times"></i>';
+
+                const wrap = document.createElement('div');
+                wrap.className = 'cell-edit-wrap';
+                wrap.appendChild(inputEl);
+                wrap.appendChild(confirmBtn);
+                wrap.appendChild(cancelBtn);
+
+                // Substituir display pelo editor
+                td.innerHTML = '';
+                td.appendChild(wrap);
+                inputEl.focus();
+                if (inputEl.type === 'text') inputEl.select();
+
+                const save = () => {
+                    let val = inputEl.value;
+                    const update = {};
+
+                    if (field === 'description') {
+                        if (!val.trim()) { cancel(); return; }
+                        update.description = val.trim();
+                    } else if (field === 'notes') {
+                        update.notes = val.trim();
+                    } else if (field === 'date') {
+                        if (!val) { cancel(); return; }
+                        update.date = val;
+                    } else if (field === 'category') {
+                        update.category = val;
+                    }
+
+                    this.db.updateTransaction(id, { ...transaction, ...update });
+                    this.showNotification('✅ Salvo!', 'success');
+                    this.loadTransactions();
+                    this.updateTransactionSummary(this.db.getTransactions({}));
+                };
+
+                const cancel = () => {
+                    td.innerHTML = '';
+                    const span = document.createElement('span');
+                    span.className = 'cell-display';
+                    span.innerHTML = originalHTML;
+                    td.appendChild(span);
+                    td.onclick = (e) => this.inlineEdit(e, id, field);
+                };
+
+                confirmBtn.onclick = (e) => { e.stopPropagation(); save(); };
+                cancelBtn .onclick = (e) => { e.stopPropagation(); cancel(); };
+
+                inputEl.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter')  { e.preventDefault(); save(); }
+                    if (e.key === 'Escape') { e.preventDefault(); cancel(); }
+                });
+
+                // Clicar fora cancela (sem salvar)
+                setTimeout(() => {
+                    const outsideClick = (e) => {
+                        if (!td.contains(e.target)) {
+                            cancel();
+                            document.removeEventListener('mousedown', outsideClick);
+                        }
+                    };
+                    document.addEventListener('mousedown', outsideClick);
+                }, 0);
             }
 
             // NOVA FUNÇÃO: Alternar seleção individual
