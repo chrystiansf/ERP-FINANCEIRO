@@ -2702,14 +2702,23 @@
                 this.subcategories = JSON.parse(localStorage.getItem('subcategories')) || [];
                 this.ministries = JSON.parse(localStorage.getItem('ministries')) || [];
                 this.costcenters = JSON.parse(localStorage.getItem('costcenters')) || [];
+                // Contador de IDs: garante unicidade mesmo em imports em lote
+                const allIds = [
+                    ...this.accounts, ...this.transactions, ...this.deletedTransactions,
+                    ...this.suppliers, ...this.customers, ...this.categories,
+                    ...this.ministries, ...this.costcenters
+                ].map(r => Number(r.id) || 0);
+                this._nextId = (allIds.length ? Math.max(...allIds) : 0) + 1;
                 this.init();
             }
+
+            _uid() { return this._nextId++; }
 
             init() {
                 if (this.accounts.length === 0) {
                     this.accounts = [
                         {
-                            id: Date.now(),
+                            id: this._uid(),
                             name: 'Banco do Brasil - Conta Corrente',
                             bank: 'Banco do Brasil',
                             type: 'checking',
@@ -2765,7 +2774,7 @@
                 const initialBalanceDate = account.initial_balance_date || new Date().toISOString().split('T')[0];
                 
                 const newAccount = {
-                    id: Date.now(),
+                    id: this._uid(),
                     ...account,
                     initial_balance: initialBalance,
                     initial_balance_date: initialBalanceDate,
@@ -2839,7 +2848,7 @@
             // ==================== SUPPLIERS ====================
             addSupplier(supplier) {
                 const newSupplier = {
-                    id: Date.now(),
+                    id: this._uid(),
                     ...supplier,
                     created_at: new Date().toISOString()
                 };
@@ -2878,7 +2887,7 @@
             // ==================== CUSTOMERS ====================
             addCustomer(customer) {
                 const newCustomer = {
-                    id: Date.now(),
+                    id: this._uid(),
                     ...customer,
                     created_at: new Date().toISOString()
                 };
@@ -2921,7 +2930,7 @@
                     : [];
                 
                 const newCategory = {
-                    id: Date.now(),
+                    id: this._uid(),
                     name: category.name,
                     type: category.type,
                     description: category.description || '',
@@ -2973,7 +2982,7 @@
             // ==================== COST CENTERS ====================
             addCostCenter(costcenter) {
                 const newCostCenter = {
-                    id: Date.now(),
+                    id: this._uid(),
                     ...costcenter,
                     created_at: new Date().toISOString()
                 };
@@ -3012,7 +3021,7 @@
             // ==================== MINISTRIES ====================
             addMinistry(ministry) {
                 const newMinistry = {
-                    id: Date.now(),
+                    id: this._uid(),
                     ...ministry,
                     created_at: new Date().toISOString()
                 };
@@ -3050,7 +3059,7 @@
 
             addTransaction(transaction) {
                 const newTransaction = {
-                    id: Date.now(),
+                    id: this._uid(),
                     ...transaction,
                     amount: parseFloat(transaction.amount),
                     reconciled: false,  // Sempre false ao criar, mesmo que venha true
