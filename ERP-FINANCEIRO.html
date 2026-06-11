@@ -7295,7 +7295,7 @@ exportCategoryToPDF(days, startDate, endDate, observacao = '') {
     sf(238,238,238); doc.rect(ML, y, CW, 10, 'F');
     sd(170,170,170); doc.setLineWidth(0.2); doc.rect(ML, y, CW, 10, 'S');
     doc.setFontSize(8.5); doc.setFont('helvetica','bold'); st(...DARK);
-    doc.text('SALDO FINAL DO PERÍODO (Total em Contas)', ML+4, y+6.5);
+    doc.text('SALDO DA CONTA BANCÁRIA', ML+4, y+6.5);
     doc.text(`${saldoFinal>=0?'+ ':'- '}${this.formatCurrency(Math.abs(saldoFinal))}`, MR, y+6.5, {align:'right'});
     y += 13;
 
@@ -7307,13 +7307,15 @@ exportCategoryToPDF(days, startDate, endDate, observacao = '') {
         doc.setFontSize(7); doc.setFont('helvetica','bold'); st(...DARK);
         doc.text('OBSERVAÇÕES:', ML+4, y+4);
         y += 7;
-        const linhas = doc.splitTextToSize(observacao, CW - 8);
-        const altObs = linhas.length * 5 + 6;
+        doc.setFontSize(8); doc.setFont('helvetica','normal');
+        const linhas = doc.splitTextToSize(observacao, CW - 10);
+        const lh     = 5.5;
+        const altObs = linhas.length * lh + 7;
         checkPage(altObs + 5);
         sf(252,252,252); doc.rect(ML, y, CW, altObs, 'F');
         sd(200,200,200); doc.setLineWidth(0.1); doc.rect(ML, y, CW, altObs, 'S');
-        doc.setFontSize(8); doc.setFont('helvetica','normal'); st(50,50,50);
-        doc.text(linhas, ML+4, y+5);
+        st(50,50,50);
+        doc.text(linhas, ML+5, y+5, {lineHeightFactor: 1.4});
         y += altObs + 4;
     }
 
@@ -7552,13 +7554,15 @@ exportComparativoPDF() {
         doc.setFontSize(7); doc.setFont('helvetica','bold'); st(...DARK);
         doc.text('OBSERVAÇÕES:', ML+4, y+4);
         y += 7;
-        const linhas  = doc.splitTextToSize(observacao, CW - 8);
-        const altObs  = linhas.length * 5 + 6;
+        doc.setFontSize(8); doc.setFont('helvetica','normal');
+        const linhas  = doc.splitTextToSize(observacao, CW - 10);
+        const lh2     = 5.5;
+        const altObs  = linhas.length * lh2 + 7;
         if (y + altObs > H-15) { doc.addPage(); y=15; }
         sf(252,252,252); doc.rect(ML, y, CW, altObs, 'F');
         sd(200,200,200); doc.setLineWidth(0.1); doc.rect(ML, y, CW, altObs, 'S');
-        doc.setFontSize(8); doc.setFont('helvetica','normal'); st(50,50,50);
-        doc.text(linhas, ML+4, y+5);
+        st(50,50,50);
+        doc.text(linhas, ML+5, y+5, {lineHeightFactor: 1.4});
         y += altObs + 4;
     }
 
