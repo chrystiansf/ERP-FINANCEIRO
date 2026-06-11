@@ -1599,9 +1599,13 @@
                             <i class="fas fa-edit"></i> Editar
                         </button>
                     </div>
-                    <button onclick="app.customizeMenu()" class="btn-small btn-primary-small" style="margin-bottom: 0;">
+                    <button onclick="app.customizeMenu()" class="btn-small btn-primary-small" style="margin-bottom: 8px;">
                         <i class="fas fa-cog"></i> Personalizar Menu
                     </button>
+                    <button onclick="app.uploadCompanyLogo()" class="btn-small btn-primary-small" style="margin-bottom: 0;" id="logo-upload-btn">
+                        <i class="fas fa-image"></i> <span id="logo-btn-label">Logomarca</span>
+                    </button>
+                    <input type="file" id="logo-file-input" accept="image/*" style="display:none;" onchange="app.handleLogoUpload(this)">
                 </div>
                 <div class="backup-section">
                     <label class="section-label">
@@ -7096,6 +7100,13 @@ exportCategoryToPDF(days, startDate, endDate) {
     const totalDesp = Object.values(despesas).reduce((s,v)=>s+v, 0);
     const resultado = totalRec - totalDesp;
 
+    // Saldo final: soma dos saldos de todas as contas
+    const allAccounts = this.db.getAccounts ? this.db.getAccounts() : (this.db.accounts || []);
+    const saldoFinal  = allAccounts.reduce((s, a) => s + (parseFloat(a.current_balance) || 0), 0);
+
+    const systemName  = localStorage.getItem('systemName') || 'ERP Financeiro';
+    const logoData    = this.getCompanyLogo();
+
     const W = 210; const H = 297;
     const ML = 20; const MR = W - 20; const CW = MR - ML;
 
@@ -7104,135 +7115,159 @@ exportCategoryToPDF(days, startDate, endDate) {
     const sd = (r,g,b) => doc.setDrawColor(r,g,b);
 
     // ── CABEÇALHO ─────────────────────────────────────────────────────────────
-    sf(15,40,80); doc.rect(0, 0, W, 24, 'F');
-    sf(180,140,60); doc.rect(0, 24, W, 1, 'F');
+    // Barra superior fina na cor primária
+    sf(30,60,114); doc.rect(0, 0, W, 1.5, 'F');
 
-    doc.setFontSize(14); doc.setFont('helvetica','bold'); st(255,255,255);
-    doc.text('DEMONSTRAÇÃO DO RESULTADO DO EXERCÍCIO', W/2, 11, {align:'center'});
-    doc.setFontSize(8); doc.setFont('helvetica','normal'); st(180,200,240);
-    doc.text(`DRE — Período: ${periodText}   |   Emissão: ${new Date().toLocaleDateString('pt-BR')}`, W/2, 18.5, {align:'center'});
+    // Área do cabeçalho branca com borda inferior
+    sf(255,255,255); doc.rect(0, 1.5, W, 30, 'F');
 
-    // ── 3 BLOCOS RESUMO ───────────────────────────────────────────────────────
+    // Logo (se existir): canto esquerdo
+    let headerTextX = ML;
+    if (logoData) {
+        try {
+            const ext = logoData.startsWith('data:image/png') ? 'PNG' : 'JPEG';
+            doc.addImage(logoData, ext, ML, 4, 28, 20);
+            headerTextX = ML + 32;
+        } catch(e) { /* ignora erro de imagem */ }
+    }
+
+    // Nome da empresa e título do relatório
+    doc.setFontSize(7); doc.setFont('helvetica','normal'); st(100,110,130);
+    doc.text(systemName.toUpperCase(), headerTextX, 11);
+    doc.setFontSize(13); doc.setFont('helvetica','bold'); st(20,40,80);
+    doc.text('DEMONSTRAÇÃO DO RESULTADO DO EXERCÍCIO', headerTextX, 18);
+    doc.setFontSize(7.5); doc.setFont('helvetica','normal'); st(90,100,120);
+    doc.text(`Período: ${periodText}   •   Emissão: ${new Date().toLocaleDateString('pt-BR')}`, headerTextX, 24.5);
+
+    // Linha divisória cabeçalho
+    sd(30,60,114); doc.setLineWidth(0.4);
+    doc.line(0, 31.5, W, 31.5);
+    doc.setLineWidth(0.2);
+
+    // ── 3 BLOCOS RESUMO (tons neutros) ────────────────────────────────────────
     const bW = CW / 3 - 3;
-    const blocks = [
-        { label:'RECEITA BRUTA',      val: this.formatCurrency(totalRec),  r:26,  g:86,  b:219 },
-        { label:'TOTAL DE DESPESAS',  val: this.formatCurrency(totalDesp), r:185, g:28,  b:28  },
-        { label:'RESULTADO LÍQUIDO',  val: this.formatCurrency(Math.abs(resultado)), r:resultado>=0?22:185, g:resultado>=0?163:28, b:resultado>=0?74:28, sign:resultado>=0?'+':'-' },
+    const summaryBlocks = [
+        { label: 'RECEITA BRUTA',     val: this.formatCurrency(totalRec),              sign: '+' },
+        { label: 'TOTAL DE DESPESAS', val: this.formatCurrency(totalDesp),             sign: '-' },
+        { label: 'RESULTADO LÍQUIDO', val: this.formatCurrency(Math.abs(resultado)),   sign: resultado >= 0 ? '+' : '-' },
     ];
-    blocks.forEach((b, i) => {
+    summaryBlocks.forEach((b, i) => {
         const x = ML + i * (bW + 3);
-        sf(b.r, b.g, b.b); doc.rect(x, 27, bW, 1.5, 'F');
-        sf(245,247,250); doc.rect(x, 28.5, bW, 17, 'F');
-        doc.setFontSize(6.5); doc.setFont('helvetica','bold'); st(100,110,125);
-        doc.text(b.label, x + bW/2, 34.5, {align:'center'});
-        doc.setFontSize(12); doc.setFont('helvetica','bold'); st(b.r, b.g, b.b);
-        const prefix = b.sign ? b.sign + ' ' : '';
-        doc.text(`${prefix}${b.val}`, x + bW/2, 42, {align:'center'});
+        sf(240,242,245); doc.rect(x, 34, bW, 16, 'F');
+        sd(200,205,215); doc.setLineWidth(0.15);
+        doc.rect(x, 34, bW, 16, 'S');
+        // Topo colorido sutil
+        const topC = i===0 ? [60,120,60] : i===1 ? [140,50,50] : resultado>=0 ? [30,80,160] : [140,50,50];
+        sf(topC[0],topC[1],topC[2]); doc.rect(x, 34, bW, 1.2, 'F');
+        doc.setFontSize(6); doc.setFont('helvetica','bold'); st(80,90,110);
+        doc.text(b.label, x + bW/2, 39.5, {align:'center'});
+        doc.setFontSize(10); doc.setFont('helvetica','bold');
+        const vc = i===0 ? [40,100,40] : i===1 ? [160,40,40] : resultado>=0 ? [25,70,150] : [160,40,40];
+        st(vc[0],vc[1],vc[2]);
+        doc.text(`${b.sign} ${b.val}`, x + bW/2, 46.5, {align:'center'});
     });
 
-    let y = 50;
+    let y = 55;
 
     // ── HELPERS ───────────────────────────────────────────────────────────────
-    const secHeader = (txt, r, g, b) => {
-        if (y > H - 40) { doc.addPage(); y = 15; }
-        sf(r,g,b); doc.rect(ML, y, CW, 7.5, 'F');
-        doc.setFontSize(8.5); doc.setFont('helvetica','bold'); st(255,255,255);
-        doc.text(txt, ML+5, y+5.2);
-        y += 8.5;
+    const checkPage = (needed = 35) => {
+        if (y > H - needed) { doc.addPage(); y = 15; }
     };
 
-    // PCT_COL = posição X da coluna de percentual (alinhado antes do valor)
-    const PCT_COL = MR - 28;
-
-    const itemRow = (label, val, pct) => {
-        if (y > H - 35) { doc.addPage(); y = 15; }
-        sf(248,250,253); doc.rect(ML, y, CW, 7, 'F');
-        sd(215,220,228); doc.setLineWidth(0.12); doc.line(ML, y+7, MR, y+7);
-        doc.setFontSize(8); doc.setFont('helvetica','normal'); st(35,40,55);
-        doc.text(label, ML+4, y+4.8);
-        if (pct !== undefined) {
-            doc.setFontSize(7.5); st(120,130,150);
-            doc.text(pct, PCT_COL, y+4.8, {align:'right'});
-        }
-        doc.setFontSize(8); doc.setFont('helvetica','bold'); st(35,40,55);
-        doc.text(this.formatCurrency(val), MR, y+4.8, {align:'right'});
-        y += 7;
+    const secHeader = (num, txt) => {
+        checkPage(40);
+        sf(30,60,114); doc.rect(ML, y, CW, 7, 'F');
+        doc.setFontSize(8); doc.setFont('helvetica','bold'); st(255,255,255);
+        doc.text(`${num}   ${txt}`, ML+4, y+4.8);
+        y += 8;
     };
 
-    const itemRowAlt = (label, val, pct) => {
-        if (y > H - 35) { doc.addPage(); y = 15; }
-        sf(255,255,255); doc.rect(ML, y, CW, 7, 'F');
-        sd(215,220,228); doc.setLineWidth(0.12); doc.line(ML, y+7, MR, y+7);
-        doc.setFontSize(8); doc.setFont('helvetica','normal'); st(35,40,55);
-        doc.text(label, ML+4, y+4.8);
-        if (pct !== undefined) {
-            doc.setFontSize(7.5); st(120,130,150);
-            doc.text(pct, PCT_COL, y+4.8, {align:'right'});
-        }
-        doc.setFontSize(8); doc.setFont('helvetica','bold'); st(35,40,55);
-        doc.text(this.formatCurrency(val), MR, y+4.8, {align:'right'});
-        y += 7;
+    const PCT_COL = MR - 26;
+
+    const itemRow = (label, val, pct, shade) => {
+        checkPage();
+        if (shade) { sf(246,248,251); doc.rect(ML, y, CW, 6.5, 'F'); }
+        else       { sf(255,255,255); doc.rect(ML, y, CW, 6.5, 'F'); }
+        sd(220,225,232); doc.setLineWidth(0.1); doc.line(ML, y+6.5, MR, y+6.5);
+        doc.setFontSize(7.5); doc.setFont('helvetica','normal'); st(40,45,60);
+        doc.text(label, ML+4, y+4.4);
+        if (pct) { doc.setFontSize(7); st(130,140,160); doc.text(pct, PCT_COL, y+4.4, {align:'right'}); }
+        doc.setFontSize(7.5); doc.setFont('helvetica','bold'); st(40,45,60);
+        doc.text(this.formatCurrency(val), MR, y+4.4, {align:'right'});
+        y += 6.5;
     };
 
-    const subtotal = (label, val, fr, fg, fb, tr, tg, tb) => {
-        if (y > H - 35) { doc.addPage(); y = 15; }
-        sf(fr,fg,fb); doc.rect(ML, y, CW, 8.5, 'F');
-        doc.setFontSize(9); doc.setFont('helvetica','bold'); st(tr,tg,tb);
-        doc.text(label, ML+5, y+5.8);
-        doc.text(this.formatCurrency(val), MR, y+5.8, {align:'right'});
+    const subtotalRow = (label, val) => {
+        checkPage();
+        sf(232,236,242); doc.rect(ML, y, CW, 8, 'F');
+        sd(190,198,210); doc.setLineWidth(0.2); doc.rect(ML, y, CW, 8, 'S');
+        doc.setFontSize(8.5); doc.setFont('helvetica','bold'); st(25,40,70);
+        doc.text(label, ML+4, y+5.4);
+        doc.text(this.formatCurrency(val), MR, y+5.4, {align:'right'});
         y += 9.5;
     };
 
     // ── SEÇÃO RECEITAS ────────────────────────────────────────────────────────
-    secHeader('1.   RECEITAS OPERACIONAIS', 22, 101, 52);
+    secHeader('1.', 'RECEITAS OPERACIONAIS');
     const recList = Object.entries(receitas).sort((a,b)=>b[1]-a[1]);
     recList.forEach(([cat,val], i) => {
         const pct = totalRec > 0 ? (val/totalRec*100).toFixed(1)+'%' : '0%';
-        i%2===0 ? itemRow(cat, val, pct) : itemRowAlt(cat, val, pct);
+        itemRow(cat, val, pct, i%2===0);
     });
-    if (recList.length === 0) itemRow('Nenhuma receita no período', 0, '');
+    if (recList.length === 0) itemRow('Nenhuma receita no período', 0, '', false);
     y += 1;
-    subtotal('(=)   RECEITA BRUTA TOTAL', totalRec, 220,240,222, 15,100,40);
+    subtotalRow('(=)   RECEITA BRUTA TOTAL', totalRec);
 
     y += 5;
 
     // ── SEÇÃO DESPESAS ────────────────────────────────────────────────────────
-    secHeader('2.   DESPESAS OPERACIONAIS', 160, 30, 30);
+    secHeader('2.', 'DESPESAS OPERACIONAIS');
     const despList = Object.entries(despesas).sort((a,b)=>b[1]-a[1]);
     despList.forEach(([cat,val], i) => {
         const pct = totalDesp > 0 ? (val/totalDesp*100).toFixed(1)+'%' : '0%';
-        i%2===0 ? itemRow(cat, val, pct) : itemRowAlt(cat, val, pct);
+        itemRow(cat, val, pct, i%2===0);
     });
-    if (despList.length === 0) itemRow('Nenhuma despesa no período', 0, '');
+    if (despList.length === 0) itemRow('Nenhuma despesa no período', 0, '', false);
     y += 1;
-    subtotal('(-)   TOTAL DE DESPESAS', totalDesp, 250,218,218, 160,30,30);
+    subtotalRow('(-)   TOTAL DE DESPESAS', totalDesp);
 
     y += 6;
 
-    // ── LINHA DUPLA ───────────────────────────────────────────────────────────
-    if (y > H - 40) { doc.addPage(); y = 15; }
-    sd(15,40,80); doc.setLineWidth(0.6);
-    doc.line(ML, y, MR, y); doc.line(ML, y+2, MR, y+2);
+    // ── RESULTADO DO PERÍODO ──────────────────────────────────────────────────
+    checkPage(45);
+    sd(30,60,114); doc.setLineWidth(0.5);
+    doc.line(ML, y, MR, y);
     doc.setLineWidth(0.2);
-    y += 6;
+    y += 5;
 
-    // ── RESULTADO FINAL ───────────────────────────────────────────────────────
-    sf(15,40,80); doc.rect(ML, y, CW, 14, 'F');
-    doc.setFontSize(11); doc.setFont('helvetica','bold'); st(180,140,60);
-    doc.text('(=)   RESULTADO LÍQUIDO DO PERÍODO', ML+5, y+9.5);
-    const rc = resultado>=0 ? [100,230,160] : [255,140,140];
-    st(rc[0],rc[1],rc[2]);
-    doc.text(`${resultado>=0?'+ ':'- '}${this.formatCurrency(Math.abs(resultado))}`, MR, y+9.5, {align:'right'});
+    sf(30,60,114); doc.rect(ML, y, CW, 11, 'F');
+    doc.setFontSize(10); doc.setFont('helvetica','bold'); st(255,255,255);
+    doc.text('(=)   RESULTADO LÍQUIDO DO PERÍODO', ML+5, y+7);
+    const resColor = resultado >= 0 ? [180,230,200] : [255,180,180];
+    st(resColor[0],resColor[1],resColor[2]);
+    doc.text(`${resultado>=0?'+ ':'- '}${this.formatCurrency(Math.abs(resultado))}`, MR, y+7, {align:'right'});
+    y += 13;
+
+    // ── SALDO FINAL DAS CONTAS ────────────────────────────────────────────────
+    checkPage(20);
+    sf(245,247,250); doc.rect(ML, y, CW, 10, 'F');
+    sd(200,208,220); doc.setLineWidth(0.2); doc.rect(ML, y, CW, 10, 'S');
+    doc.setFontSize(8.5); doc.setFont('helvetica','bold'); st(40,50,70);
+    doc.text('SALDO FINAL DO PERÍODO (Total em Contas)', ML+4, y+6.5);
+    const saldoColor = saldoFinal >= 0 ? [30,100,50] : [160,30,30];
+    st(saldoColor[0],saldoColor[1],saldoColor[2]);
+    doc.text(`${saldoFinal>=0?'+ ':'- '}${this.formatCurrency(Math.abs(saldoFinal))}`, MR, y+6.5, {align:'right'});
+    y += 11;
 
     // ── RODAPÉ ────────────────────────────────────────────────────────────────
     const pages = doc.internal.getNumberOfPages();
     for (let p=1; p<=pages; p++) {
         doc.setPage(p);
-        sf(220,225,232); doc.rect(0, H-8, W, 8, 'F');
-        doc.setFontSize(6.5); doc.setFont('helvetica','normal'); st(110,120,135);
-        doc.text('DOCUMENTO CONFIDENCIAL — USO INTERNO', ML, H-3);
-        doc.text(`Página ${p} de ${pages}`, W/2, H-3, {align:'center'});
-        doc.text('ERP Financeiro Profissional', MR, H-3, {align:'right'});
+        sf(30,60,114); doc.rect(0, H-7, W, 7, 'F');
+        doc.setFontSize(6.5); doc.setFont('helvetica','normal'); st(190,205,230);
+        doc.text('DOCUMENTO CONFIDENCIAL — USO INTERNO', ML, H-2.5);
+        doc.text(`Página ${p} de ${pages}`, W/2, H-2.5, {align:'center'});
+        doc.text(systemName, MR, H-2.5, {align:'right'});
     }
 
     doc.save(`DRE_${periodText.replace(/\s/g,'_').replace(/\//g,'-')}.pdf`);
@@ -7616,6 +7651,37 @@ exportCategoryToExcel(days, startDate, endDate) {
                 if (savedName) {
                     document.getElementById('system-name').textContent = savedName;
                 }
+                this._updateLogoBtnLabel();
+            }
+
+            uploadCompanyLogo() {
+                document.getElementById('logo-file-input').click();
+            }
+
+            handleLogoUpload(input) {
+                const file = input.files[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const currentCompany = localStorage.getItem('currentCompany') || 'default';
+                    localStorage.setItem(`company_logo_${currentCompany}`, e.target.result);
+                    this._updateLogoBtnLabel();
+                    this.showNotification('Logomarca salva com sucesso!', 'success');
+                };
+                reader.readAsDataURL(file);
+                input.value = '';
+            }
+
+            getCompanyLogo() {
+                const currentCompany = localStorage.getItem('currentCompany') || 'default';
+                return localStorage.getItem(`company_logo_${currentCompany}`) || null;
+            }
+
+            _updateLogoBtnLabel() {
+                const lbl = document.getElementById('logo-btn-label');
+                if (!lbl) return;
+                const hasLogo = !!this.getCompanyLogo();
+                lbl.textContent = hasLogo ? 'Trocar Logo' : 'Logomarca';
             }
 
             // ===== SISTEMA DE MÚLTIPLAS EMPRESAS =====
