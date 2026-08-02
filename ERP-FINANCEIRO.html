@@ -7004,18 +7004,46 @@
                     return '-';
                 };
 
-                let runningBal = initBal;
+                // Calcular saldo real em cada transação:
+                // 1) Partir do saldo atual e reverter transações pós-período para obter saldo no fim do período
+                const allTrans = this.db.getTransactions({});
+                const postPeriod = endDate ? allTrans.filter(t => t.date > endDate) : [];
+                const balAtEnd = currentBal + postPeriod.reduce((s,t) => s + (t.type==='expense' ? t.amount : -t.amount), 0);
+
+                // 2) Pegar TODAS as transações do período (sem filtro de tipo) para calcular saldo real
+                let allInPeriod;
+                if (startDate && endDate) {
+                    allInPeriod = allTrans.filter(t => t.date >= startDate && t.date <= endDate);
+                } else {
+                    allInPeriod = allTrans.filter(t => {
+                        const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - days);
+                        return new Date(t.date) >= cutoff;
+                    });
+                }
+                allInPeriod.sort((a,b) => new Date(a.date) - new Date(b.date));
+
+                // 3) Calcular saldo no início do período
+                const periodNet = allInPeriod.reduce((s,t) => s + (t.type==='income' ? t.amount : -t.amount), 0);
+                let runningBal = balAtEnd - periodNet;
+
+                // 4) Construir mapa id → saldo real após cada transação
+                const balMap = new Map();
+                allInPeriod.forEach(t => {
+                    runningBal += t.type==='income' ? t.amount : -t.amount;
+                    balMap.set(t.id, runningBal);
+                });
+
                 const tableData = transactions.map(t => {
                     const category = this.db.getCategory(parseInt(t.category));
                     const ministry = this.db.getMinistry(parseInt(t.ministry));
                     const party    = resolveParty(t);
-                    runningBal += t.type==='income' ? t.amount : -t.amount;
+                    const saldoReal = balMap.has(t.id) ? balMap.get(t.id) : null;
                     return [
                         this.formatDate(t.date),
                         (t.description||'').substring(0,40),
                         t.type==='income' ? 'ENTRADA' : 'SAÍDA',
                         (t.type==='income'?'+ ':'- ') + this.formatCurrency(t.amount),
-                        this.formatCurrency(runningBal),
+                        saldoReal !== null ? this.formatCurrency(saldoReal) : '-',
                         party.substring(0,22),
                         category ? (category.name||'').substring(0,20) : '-',
                         ministry ? (ministry.name||'').substring(0,18) : '-',
