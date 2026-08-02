@@ -6909,154 +6909,171 @@
                 }
                 transactions.sort((a, b) => new Date(a.date) - new Date(b.date));
 
-                const income    = transactions.filter(t => t.type==='income').reduce((s,t)=>s+t.amount, 0);
-                const expense   = transactions.filter(t => t.type==='expense').reduce((s,t)=>s+t.amount, 0);
-                const netCash   = income - expense;
+                const income     = transactions.filter(t => t.type==='income').reduce((s,t)=>s+t.amount, 0);
+                const expense    = transactions.filter(t => t.type==='expense').reduce((s,t)=>s+t.amount, 0);
+                const netCash    = income - expense;
                 const currentBal = this.db.accounts.reduce((s,a)=>s+(parseFloat(a.current_balance)||0), 0);
                 const initBal    = this.db.accounts.reduce((s,a)=>s+(parseFloat(a.initial_balance)||0), 0);
+                const systemName = localStorage.getItem('systemName') || 'ERP Financeiro';
+                const logoData   = this.getCompanyLogo();
 
                 const W = 297; const H = 210;
                 const ML = 15; const MR = W - 15; const CW = MR - ML;
+                const DARK = [60,60,60];
 
                 const sf = (r,g,b) => doc.setFillColor(r,g,b);
                 const st = (r,g,b) => doc.setTextColor(r,g,b);
                 const sd = (r,g,b) => doc.setDrawColor(r,g,b);
 
                 // ── CABEÇALHO ─────────────────────────────────────────────────
-                sf(15,40,80); doc.rect(0, 0, W, 20, 'F');
-                sf(180,140,60); doc.rect(0, 20, W, 1, 'F');
+                sf(...DARK); doc.rect(0, 0, W, 1.5, 'F');
+                sf(255,255,255); doc.rect(0, 1.5, W, 30, 'F');
 
-                doc.setFontSize(14); doc.setFont('helvetica','bold'); st(255,255,255);
-                doc.text('DEMONSTRAÇÃO DO FLUXO DE CAIXA', W/2, 9, {align:'center'});
-                doc.setFontSize(8); doc.setFont('helvetica','normal'); st(180,200,240);
-                doc.text(`Período: ${periodText}   |   Emissão: ${new Date().toLocaleDateString('pt-BR')} ${new Date().toLocaleTimeString('pt-BR')}   |   Método Direto`, W/2, 16, {align:'center'});
+                let textX = ML;
+                if (logoData) {
+                    try {
+                        const ext = logoData.startsWith('data:image/png') ? 'PNG' : 'JPEG';
+                        doc.addImage(logoData, ext, ML, 3, 36, 25);
+                        textX = ML + 40;
+                    } catch(e) {}
+                }
+                doc.setFontSize(7);  doc.setFont('helvetica','normal'); st(110,110,110);
+                doc.text(systemName.toUpperCase(), textX, 10);
+                doc.setFontSize(13); doc.setFont('helvetica','bold'); st(...DARK);
+                doc.text('DEMONSTRAÇÃO DO FLUXO DE CAIXA', textX, 18);
+                doc.setFontSize(7.5); doc.setFont('helvetica','normal'); st(100,100,100);
+                doc.text(`Período: ${periodText}   •   Emissão: ${new Date().toLocaleDateString('pt-BR')}   •   Método Direto`, textX, 25);
 
-                // ── RESUMO (3 BLOCOS) ─────────────────────────────────────────
+                sd(...DARK); doc.setLineWidth(0.5); doc.line(0, 31.5, W, 31.5); doc.setLineWidth(0.2);
+
+                // ── BLOCOS RESUMO ─────────────────────────────────────────────
                 const bW = CW / 3 - 3;
-                const blocks = [
-                    { label:'TOTAL DE ENTRADAS', val: this.formatCurrency(income),  r:22, g:163, b:74,  sign:'+' },
-                    { label:'TOTAL DE SAÍDAS',   val: this.formatCurrency(expense), r:185, g:28, b:28,  sign:'-' },
-                    { label:'RESULTADO DO PERÍODO', val: this.formatCurrency(Math.abs(netCash)), r:netCash>=0?22:185, g:netCash>=0?163:28, b:netCash>=0?74:28, sign:netCash>=0?'+':'-' },
+                const summaryBlocks = [
+                    { label:'TOTAL DE ENTRADAS',   val: this.formatCurrency(income),              sign:'+' },
+                    { label:'TOTAL DE SAÍDAS',     val: this.formatCurrency(expense),             sign:'-' },
+                    { label:'RESULTADO DO PERÍODO',val: this.formatCurrency(Math.abs(netCash)),   sign: netCash>=0?'+':'-' },
                 ];
-                blocks.forEach((b, i) => {
+                summaryBlocks.forEach((b, i) => {
                     const x = ML + i * (bW + 3);
-                    sf(b.r, b.g, b.b); doc.rect(x, 24, bW, 1.5, 'F');
-                    sf(245,247,250); doc.rect(x, 25.5, bW, 16, 'F');
-                    doc.setFontSize(6.5); doc.setFont('helvetica','bold'); st(100,110,125);
-                    doc.text(b.label, x + bW/2, 31, {align:'center'});
-                    doc.setFontSize(12); doc.setFont('helvetica','bold'); st(b.r, b.g, b.b);
-                    doc.text(`${b.sign} ${b.val}`, x + bW/2, 38.5, {align:'center'});
+                    sf(240,240,240); doc.rect(x, 34, bW, 14, 'F');
+                    sd(185,185,185); doc.setLineWidth(0.15); doc.rect(x, 34, bW, 14, 'S');
+                    sf(...DARK); doc.rect(x, 34, bW, 1.2, 'F');
+                    doc.setFontSize(6); doc.setFont('helvetica','bold'); st(90,90,90);
+                    doc.text(b.label, x + bW/2, 39, {align:'center'});
+                    doc.setFontSize(10); doc.setFont('helvetica','bold'); st(...DARK);
+                    doc.text(`${b.sign} ${b.val}`, x + bW/2, 45, {align:'center'});
                 });
 
-                // ── BARRA SALDO ───────────────────────────────────────────────
-                sf(30,50,90); doc.rect(ML, 44, CW, 8, 'F');
-                doc.setFontSize(7); doc.setFont('helvetica','bold');
-                st(160,185,230); doc.text('SALDO INICIAL:', ML+4, 49.3);
-                st(255,255,255); doc.text(this.formatCurrency(initBal), ML+50, 49.3, {align:'right'});
-                st(160,185,230); doc.text('MOVIMENTAÇÃO:', ML+CW/2-10, 49.3);
-                const mc = netCash>=0 ? [120,230,160] : [255,150,150];
-                st(mc[0],mc[1],mc[2]); doc.text(`${netCash>=0?'+ ':'- '}${this.formatCurrency(Math.abs(netCash))}`, ML+CW/2+40, 49.3, {align:'right'});
-                st(160,185,230); doc.text('SALDO ATUAL:', MR-55, 49.3);
-                st(255,255,255); doc.text(this.formatCurrency(currentBal), MR-2, 49.3, {align:'right'});
+                // ── BARRA DE SALDOS ───────────────────────────────────────────
+                sf(...DARK); doc.rect(ML, 50, CW, 7.5, 'F');
+                doc.setFontSize(7); doc.setFont('helvetica','bold'); st(210,210,210);
+                doc.text('SALDO INICIAL:', ML+4, 55);
+                st(255,255,255); doc.text(this.formatCurrency(initBal), ML+52, 55, {align:'right'});
+                st(210,210,210); doc.text('MOVIMENTAÇÃO:', ML + CW/2 - 5, 55);
+                st(255,255,255); doc.text(`${netCash>=0?'+ ':'- '}${this.formatCurrency(Math.abs(netCash))}`, ML + CW/2 + 45, 55, {align:'right'});
+                st(210,210,210); doc.text('SALDO ATUAL:', MR - 52, 55);
+                st(255,255,255); doc.text(this.formatCurrency(currentBal), MR, 55, {align:'right'});
 
                 // ── TABELA ────────────────────────────────────────────────────
+                // Busca robusta de fornecedor/cliente independente do tipo
+                const resolveParty = (t) => {
+                    const sid = t.supplier, cid = t.customer;
+                    if (sid) {
+                        const s = this.db.suppliers.find(s => s.id == sid || s.name === sid);
+                        if (s) return s.name;
+                        if (typeof sid === 'string' && sid.trim()) return sid;
+                    }
+                    if (cid) {
+                        const c = this.db.customers.find(c => c.id == cid || c.name === cid);
+                        if (c) return c.name;
+                        if (typeof cid === 'string' && cid.trim()) return cid;
+                    }
+                    return '-';
+                };
+
                 let runningBal = initBal;
                 const tableData = transactions.map(t => {
-                    const account    = this.db.getAccount(t.account);
-                    const category   = this.db.getCategory(parseInt(t.category));
-                    const ministry   = this.db.getMinistry(parseInt(t.ministry));
-                    const costcenter = this.db.getCostCenter(parseInt(t.costcenter));
-                    let party = '-';
-                    if (t.type==='income' && t.customer) {
-                        const c = this.db.customers.find(c=>c.id==t.customer||c.name===t.customer);
-                        party = c ? c.name : t.customer;
-                    } else if (t.type==='expense' && t.supplier) {
-                        const s = this.db.suppliers.find(s=>s.id==t.supplier||s.name===t.supplier);
-                        party = s ? s.name : t.supplier;
-                    }
+                    const category = this.db.getCategory(parseInt(t.category));
+                    const ministry = this.db.getMinistry(parseInt(t.ministry));
+                    const party    = resolveParty(t);
                     runningBal += t.type==='income' ? t.amount : -t.amount;
                     return [
                         this.formatDate(t.date),
-                        (t.description||'').substring(0,32),
+                        (t.description||'').substring(0,40),
                         t.type==='income' ? 'ENTRADA' : 'SAÍDA',
                         (t.type==='income'?'+ ':'- ') + this.formatCurrency(t.amount),
                         this.formatCurrency(runningBal),
-                        account ? (account.name||'').substring(0,16) : '-',
-                        party.substring(0,18),
-                        category ? (category.name||'').substring(0,16) : '-',
-                        ministry ? (ministry.name||'').substring(0,14) : '-',
-                        costcenter ? (costcenter.name||'').substring(0,14) : '-',
+                        party.substring(0,22),
+                        category ? (category.name||'').substring(0,20) : '-',
+                        ministry ? (ministry.name||'').substring(0,18) : '-',
                     ];
                 });
 
                 doc.autoTable({
-                    head: [['DATA','HISTÓRICO','NAT.','VALOR','SALDO ACUM.','CONTA','CONTRAPARTE','CATEGORIA','MINISTÉRIO','C.CUSTO']],
+                    head: [['DATA','HISTÓRICO','NAT.','VALOR','SALDO ACUM.','FORNECEDOR','CATEGORIA','MINISTÉRIO']],
                     body: tableData,
-                    startY: 55,
+                    startY: 60,
                     margin: { left: ML, right: 15 },
                     styles: {
-                        fontSize: 6.2,
-                        cellPadding: { top:2, bottom:2, left:2.5, right:2.5 },
-                        textColor: [25,30,40],
-                        lineColor: [215,220,228],
-                        lineWidth: 0.15,
+                        fontSize: 6.5,
+                        cellPadding: { top:2.2, bottom:2.2, left:2.5, right:2.5 },
+                        textColor: [50,50,50],
+                        lineColor: [210,210,210],
+                        lineWidth: 0.12,
                         font: 'helvetica',
                     },
                     headStyles: {
-                        fillColor: [15,40,80],
+                        fillColor: DARK,
                         textColor: [255,255,255],
                         fontStyle: 'bold',
-                        fontSize: 6.8,
+                        fontSize: 7,
                         halign: 'center',
                         cellPadding: { top:3, bottom:3, left:2.5, right:2.5 },
                     },
-                    alternateRowStyles: { fillColor: [247,249,252] },
+                    alternateRowStyles: { fillColor: [246,246,246] },
                     columnStyles: {
-                        0: { cellWidth:19, halign:'center' },
-                        1: { cellWidth:42 },
-                        2: { cellWidth:14, halign:'center', fontStyle:'bold' },
-                        3: { cellWidth:25, halign:'right', fontStyle:'bold' },
-                        4: { cellWidth:25, halign:'right', fontStyle:'bold' },
-                        5: { cellWidth:27 },
-                        6: { cellWidth:27 },
-                        7: { cellWidth:24 },
-                        8: { cellWidth:22 },
-                        9: { cellWidth:22 },
+                        0: { cellWidth:20, halign:'center' },
+                        1: { cellWidth:55 },
+                        2: { cellWidth:16, halign:'center', fontStyle:'bold' },
+                        3: { cellWidth:28, halign:'right',  fontStyle:'bold' },
+                        4: { cellWidth:28, halign:'right',  fontStyle:'bold' },
+                        5: { cellWidth:38 },
+                        6: { cellWidth:32 },
+                        7: { cellWidth:30 },
                     },
                     didParseCell: (data) => {
                         if (data.section !== 'body') return;
                         const row = transactions[data.row.index];
                         if (!row) return;
                         if (data.column.index === 2 || data.column.index === 3) {
-                            data.cell.styles.textColor = row.type==='income' ? [22,163,74] : [185,28,28];
+                            data.cell.styles.textColor = row.type==='income' ? [30,120,60] : [180,30,30];
                         }
                         if (data.column.index === 4) {
-                            const num = parseFloat((data.cell.text[0]||'').replace(/\./g,'').replace(',','.').replace(/[^\d\-\.]/g,''));
-                            if (!isNaN(num)) data.cell.styles.textColor = num < 0 ? [185,28,28] : [22,163,74];
+                            const raw = (data.cell.text[0]||'').replace(/\s/g,'').replace(/\./g,'').replace(',','.');
+                            const num = parseFloat(raw.replace(/[^\d\-\.]/g,''));
+                            if (!isNaN(num)) data.cell.styles.textColor = num < 0 ? [180,30,30] : [30,120,60];
                         }
                     },
                     didDrawPage: (data) => {
-                        // rodapé em cada página
-                        sf(220,225,232); doc.rect(0, H-8, W, 8, 'F');
-                        doc.setFontSize(6.5); doc.setFont('helvetica','normal'); st(110,120,135);
-                        doc.text('DOCUMENTO CONFIDENCIAL — USO INTERNO', ML, H-3);
-                        doc.text(`Página ${data.pageNumber}`, W/2, H-3, {align:'center'});
-                        doc.text('ERP Financeiro Profissional', MR, H-3, {align:'right'});
+                        sf(...DARK); doc.rect(0, H-7, W, 7, 'F');
+                        doc.setFontSize(6.5); doc.setFont('helvetica','normal'); st(210,210,210);
+                        doc.text('DOCUMENTO CONFIDENCIAL — USO INTERNO', ML, H-2.5);
+                        doc.text(`Página ${data.pageNumber}`, W/2, H-2.5, {align:'center'});
+                        doc.text(systemName, MR, H-2.5, {align:'right'});
                     }
                 });
 
                 // ── LINHA TOTALIZADORA FINAL ──────────────────────────────────
                 const fy = doc.lastAutoTable ? doc.lastAutoTable.finalY + 3 : 160;
-                if (fy < H - 14) {
-                    sf(15,40,80); doc.rect(ML, fy, CW, 9, 'F');
-                    doc.setFontSize(7.5); doc.setFont('helvetica','bold');
-                    st(160,185,230); doc.text('ENTRADAS:', ML+4, fy+5.8);
-                    st(140,220,160); doc.text(`+ ${this.formatCurrency(income)}`, ML+55, fy+5.8, {align:'right'});
-                    st(160,185,230); doc.text('SAÍDAS:', ML + CW/2 - 20, fy+5.8);
-                    st(255,160,160); doc.text(`- ${this.formatCurrency(expense)}`, ML + CW/2 + 30, fy+5.8, {align:'right'});
-                    st(160,185,230); doc.text('RESULTADO:', MR-70, fy+5.8);
-                    const rc = netCash>=0 ? [140,230,170] : [255,150,150];
-                    st(rc[0],rc[1],rc[2]); doc.text(`${netCash>=0?'+ ':'- '}${this.formatCurrency(Math.abs(netCash))}`, MR, fy+5.8, {align:'right'});
+                if (fy < H - 12) {
+                    sf(...DARK); doc.rect(ML, fy, CW, 8.5, 'F');
+                    doc.setFontSize(7.5); doc.setFont('helvetica','bold'); st(255,255,255);
+                    doc.text('ENTRADAS:', ML+4, fy+5.5);
+                    doc.text(`+ ${this.formatCurrency(income)}`, ML+55, fy+5.5, {align:'right'});
+                    doc.text('SAÍDAS:', ML + CW/2 - 20, fy+5.5);
+                    doc.text(`- ${this.formatCurrency(expense)}`, ML + CW/2 + 30, fy+5.5, {align:'right'});
+                    doc.text('RESULTADO:', MR - 68, fy+5.5);
+                    doc.text(`${netCash>=0?'+ ':'- '}${this.formatCurrency(Math.abs(netCash))}`, MR, fy+5.5, {align:'right'});
                 }
 
                 doc.save(`DFC_${periodText.replace(/\s/g,'_').replace(/\//g,'-')}.pdf`);
