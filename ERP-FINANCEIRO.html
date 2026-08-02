@@ -2204,6 +2204,14 @@
                                 </div>
                             </div>
                         </div>
+                        <div class="form-group" style="margin: 10px 0;">
+                            <label style="font-size: 0.85rem;">Tipo de Lançamento:</label>
+                            <select id="cashflow-type-filter" style="width: 100%; padding: 6px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface);">
+                                <option value="all">Todos</option>
+                                <option value="expense">Somente Saídas</option>
+                                <option value="income">Somente Entradas</option>
+                            </select>
+                        </div>
                         <div class="form-row">
                             <button class="btn btn-secondary" onclick="app.exportCashflowReport('pdf')" style="flex: 1;">
                                 <i class="fas fa-file-pdf"></i>
@@ -6880,14 +6888,16 @@
                     endDate   = new Date(yr, mo + 1, 0).toISOString().split('T')[0];
                 }
                 
+                const typeFilter = (document.getElementById('cashflow-type-filter') || {}).value || 'all';
+
                 this.showNotification('Gerando relatório...', 'info');
-                
+
                 setTimeout(() => {
                     try {
                         if (format === 'pdf') {
-                            this.exportCashflowToPDF(days, startDate, endDate);
+                            this.exportCashflowToPDF(days, startDate, endDate, typeFilter);
                         } else if (format === 'excel') {
-                            this.exportCashflowToExcel(days, startDate, endDate);
+                            this.exportCashflowToExcel(days, startDate, endDate, typeFilter);
                         }
                     } catch (error) {
                         this.showNotification('Erro ao gerar relatório: ' + error.message, 'error');
@@ -6895,7 +6905,7 @@
                 }, 500);
             }
 
-            exportCashflowToPDF(days, startDate, endDate) {
+            exportCashflowToPDF(days, startDate, endDate, typeFilter = 'all') {
                 const { jsPDF } = window.jspdf;
                 const doc = new jsPDF('landscape', 'mm', 'a4');
 
@@ -6907,6 +6917,8 @@
                     transactions = this.db.getTransactions({ days });
                     periodText = `Últimos ${days} dias`;
                 }
+                if (typeFilter === 'expense') transactions = transactions.filter(t => t.type === 'expense');
+                else if (typeFilter === 'income') transactions = transactions.filter(t => t.type === 'income');
                 transactions.sort((a, b) => new Date(a.date) - new Date(b.date));
 
                 const income     = transactions.filter(t => t.type==='income').reduce((s,t)=>s+t.amount, 0);
@@ -6937,10 +6949,11 @@
                         textX = ML + 40;
                     } catch(e) {}
                 }
+                const typeLabel = typeFilter === 'expense' ? ' — SOMENTE SAÍDAS' : typeFilter === 'income' ? ' — SOMENTE ENTRADAS' : '';
                 doc.setFontSize(7);  doc.setFont('helvetica','normal'); st(110,110,110);
                 doc.text(systemName.toUpperCase(), textX, 10);
                 doc.setFontSize(13); doc.setFont('helvetica','bold'); st(...DARK);
-                doc.text('DEMONSTRAÇÃO DO FLUXO DE CAIXA', textX, 18);
+                doc.text('DEMONSTRAÇÃO DO FLUXO DE CAIXA' + typeLabel, textX, 18);
                 doc.setFontSize(7.5); doc.setFont('helvetica','normal'); st(100,100,100);
                 doc.text(`Período: ${periodText}   •   Emissão: ${new Date().toLocaleDateString('pt-BR')}   •   Método Direto`, textX, 25);
 
@@ -7080,11 +7093,11 @@
                 this.showNotification('✅ DFC gerada com sucesso!', 'success');
             }
 
-            exportCashflowToExcel(days, startDate, endDate) {
+            exportCashflowToExcel(days, startDate, endDate, typeFilter = 'all') {
                 // Buscar transações
                 let transactions;
                 let periodText;
-                
+
                 if (startDate && endDate) {
                     transactions = this.db.getTransactions({}).filter(t => {
                         return t.date >= startDate && t.date <= endDate;
@@ -7094,7 +7107,9 @@
                     transactions = this.db.getTransactions({ days });
                     periodText = `Últimos ${days} dias`;
                 }
-                
+                if (typeFilter === 'expense') transactions = transactions.filter(t => t.type === 'expense');
+                else if (typeFilter === 'income') transactions = transactions.filter(t => t.type === 'income');
+
                 const income = transactions.filter(t => t.type === 'income').reduce((sum, t) => sum + t.amount, 0);
                 const expense = transactions.filter(t => t.type === 'expense').reduce((sum, t) => sum + t.amount, 0);
                 const balance = income - expense;
