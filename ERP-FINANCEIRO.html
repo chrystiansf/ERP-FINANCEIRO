@@ -6917,12 +6917,14 @@
                     transactions = this.db.getTransactions({ days });
                     periodText = `Últimos ${days} dias`;
                 }
+                // Totais sempre com TODAS as transações do período (independente do filtro de tipo)
+                const income     = transactions.filter(t => t.type==='income').reduce((s,t)=>s+t.amount, 0);
+                const expense    = transactions.filter(t => t.type==='expense').reduce((s,t)=>s+t.amount, 0);
+
+                // Filtro de tipo afeta apenas as linhas da tabela
                 if (typeFilter === 'expense') transactions = transactions.filter(t => t.type === 'expense');
                 else if (typeFilter === 'income') transactions = transactions.filter(t => t.type === 'income');
                 transactions.sort((a, b) => new Date(a.date) - new Date(b.date));
-
-                const income     = transactions.filter(t => t.type==='income').reduce((s,t)=>s+t.amount, 0);
-                const expense    = transactions.filter(t => t.type==='expense').reduce((s,t)=>s+t.amount, 0);
                 const netCash    = income - expense;
                 const currentBal = this.db.accounts.reduce((s,a)=>s+(parseFloat(a.current_balance)||0), 0);
                 const initBal    = this.db.accounts.reduce((s,a)=>s+(parseFloat(a.initial_balance)||0), 0);
@@ -7135,12 +7137,14 @@
                     transactions = this.db.getTransactions({ days });
                     periodText = `Últimos ${days} dias`;
                 }
-                if (typeFilter === 'expense') transactions = transactions.filter(t => t.type === 'expense');
-                else if (typeFilter === 'income') transactions = transactions.filter(t => t.type === 'income');
-
+                // Totais sempre com TODAS as transações do período
                 const income = transactions.filter(t => t.type === 'income').reduce((sum, t) => sum + t.amount, 0);
                 const expense = transactions.filter(t => t.type === 'expense').reduce((sum, t) => sum + t.amount, 0);
                 const balance = income - expense;
+
+                // Filtro de tipo afeta apenas as linhas da tabela
+                if (typeFilter === 'expense') transactions = transactions.filter(t => t.type === 'expense');
+                else if (typeFilter === 'income') transactions = transactions.filter(t => t.type === 'income');
                 
                 // NOVO: Calcular saldo atual real das contas
                 const currentAccountBalance = this.db.accounts.reduce((sum, acc) => {
