@@ -7007,9 +7007,9 @@
                 };
 
                 // Calcular saldo real em cada transação:
-                // 1) Partir do saldo atual e reverter transações pós-período para obter saldo no fim do período
+                // 1) Partir do saldo atual e reverter transações CONCILIADAS pós-período (mesma lógica do DRE)
                 const allTrans = this.db.getTransactions({});
-                const postPeriod = endDate ? allTrans.filter(t => t.date > endDate) : [];
+                const postPeriod = endDate ? allTrans.filter(t => t.reconciled && t.date > endDate) : [];
                 const balAtEnd = currentBal + postPeriod.reduce((s,t) => s + (t.type==='expense' ? t.amount : -t.amount), 0);
 
                 // 2) Pegar TODAS as transações do período (sem filtro de tipo) para calcular saldo real
@@ -7053,7 +7053,7 @@
                 });
 
                 doc.autoTable({
-                    head: [['DATA','HISTÓRICO','NAT.','VALOR','SALDO ACUM.','FORNECEDOR','CATEGORIA','MINISTÉRIO']],
+                    head: [['DATA','HISTÓRICO','NAT.','VALOR','SALDO BANCÁRIO','FORNECEDOR','CATEGORIA','MINISTÉRIO']],
                     body: tableData,
                     startY: 60,
                     margin: { left: ML, right: 15 },
