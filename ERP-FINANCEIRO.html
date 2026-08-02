@@ -5638,6 +5638,8 @@
                     return; // campo não editável inline
                 }
 
+                const isSelect = inputEl.tagName === 'SELECT';
+
                 const confirmBtn = document.createElement('button');
                 confirmBtn.className = 'cell-confirm-btn';
                 confirmBtn.title = 'Salvar (Enter)';
@@ -5650,6 +5652,7 @@
 
                 const wrap = document.createElement('div');
                 wrap.className = 'cell-edit-wrap';
+                wrap.style.minWidth = isSelect ? '220px' : '';
                 wrap.appendChild(inputEl);
                 wrap.appendChild(confirmBtn);
                 wrap.appendChild(cancelBtn);
@@ -5657,11 +5660,11 @@
                 // Substituir display pelo editor
                 td.innerHTML = '';
                 td.appendChild(wrap);
-                inputEl.focus();
-                if (inputEl.type === 'text') inputEl.select();
 
                 const save = () => {
-                    let val = inputEl.value;
+                    let val = isSelect && window.jQuery && $(inputEl).data('select2')
+                        ? $(inputEl).val()
+                        : inputEl.value;
                     const update = {};
 
                     if (field === 'description') {
@@ -5679,10 +5682,10 @@
                     } else if (field === 'costcenter') {
                         update.costcenter = val;
                     } else if (field === 'supplier') {
-                        if (val.startsWith('supplier:')) {
+                        if (val && val.startsWith('supplier:')) {
                             update.supplier = val.replace('supplier:', '');
                             update.customer = '';
-                        } else if (val.startsWith('customer:')) {
+                        } else if (val && val.startsWith('customer:')) {
                             update.customer = val.replace('customer:', '');
                             update.supplier = '';
                         } else {
@@ -5698,6 +5701,9 @@
                 };
 
                 const cancel = () => {
+                    if (isSelect && window.jQuery && $(inputEl).data('select2')) {
+                        try { $(inputEl).select2('destroy'); } catch(e) {}
+                    }
                     td.innerHTML = '';
                     const span = document.createElement('span');
                     span.className = 'cell-display';
@@ -5709,21 +5715,52 @@
                 confirmBtn.onclick = (e) => { e.stopPropagation(); save(); };
                 cancelBtn .onclick = (e) => { e.stopPropagation(); cancel(); };
 
-                inputEl.addEventListener('keydown', (e) => {
-                    if (e.key === 'Enter')  { e.preventDefault(); save(); }
-                    if (e.key === 'Escape') { e.preventDefault(); cancel(); }
-                });
+                if (!isSelect) {
+                    inputEl.focus();
+                    if (inputEl.type === 'text') inputEl.select();
+                    inputEl.addEventListener('keydown', (e) => {
+                        if (e.key === 'Enter')  { e.preventDefault(); save(); }
+                        if (e.key === 'Escape') { e.preventDefault(); cancel(); }
+                    });
+                }
 
-                // Clicar fora cancela (sem salvar)
-                setTimeout(() => {
-                    const outsideClick = (e) => {
-                        if (!td.contains(e.target)) {
-                            cancel();
-                            document.removeEventListener('mousedown', outsideClick);
-                        }
-                    };
-                    document.addEventListener('mousedown', outsideClick);
-                }, 0);
+                // Aplicar Select2 nos campos de seleção
+                if (isSelect && window.jQuery) {
+                    setTimeout(() => {
+                        $(inputEl).select2({
+                            placeholder: 'Digite para buscar...',
+                            allowClear: true,
+                            width: '100%',
+                            dropdownParent: $(wrap),
+                            language: {
+                                noResults: () => 'Nenhum resultado',
+                                searching: () => 'Buscando...'
+                            }
+                        });
+                        $(inputEl).select2('open');
+                        // Salvar ao selecionar uma opção
+                        $(inputEl).on('select2:select select2:clear', () => {
+                            setTimeout(() => save(), 100);
+                        });
+                        // Fechar Select2 cancela se clicar fora
+                        $(inputEl).on('select2:close', () => {
+                            setTimeout(() => {
+                                if (td.querySelector('.cell-edit-wrap')) cancel();
+                            }, 200);
+                        });
+                    }, 0);
+                } else {
+                    // Clicar fora cancela para campos de texto
+                    setTimeout(() => {
+                        const outsideClick = (e) => {
+                            if (!td.contains(e.target)) {
+                                cancel();
+                                document.removeEventListener('mousedown', outsideClick);
+                            }
+                        };
+                        document.addEventListener('mousedown', outsideClick);
+                    }, 0);
+                }
             }
 
             // NOVA FUNÇÃO: Alternar seleção individual
