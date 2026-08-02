@@ -5518,10 +5518,10 @@
                                 </span>
                             </td>
                             <td>${account?.name || 'N/A'}</td>
-                            <td>${clientSupplierName}</td>
+                            ${ec('supplier', clientSupplierName)}
                             ${ec('category', categoryName)}
-                            <td>${ministryName}</td>
-                            <td>${costcenterName}</td>
+                            ${ec('ministry', ministryName)}
+                            ${ec('costcenter', costcenterName)}
                             ${ec('notes', `<span style="max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:inline-block;" title="${this._escapeHtml(t.notes||'')}">${this._escapeHtml(t.notes||'-')}</span>`)}
                             <td>
                                 <span class="status-badge ${t.reconciled ? 'reconciled' : 'pending'}">
@@ -5610,6 +5610,30 @@
                             `<option value="${c.id}" ${String(transaction.category) === String(c.id) ? 'selected' : ''}>${c.name}</option>`
                         ).join('');
 
+                } else if (field === 'ministry') {
+                    inputEl = document.createElement('select');
+                    inputEl.innerHTML = '<option value="">— Sem ministério —</option>' +
+                        (this.db.ministries || []).map(m =>
+                            `<option value="${m.id}" ${String(transaction.ministry) === String(m.id) ? 'selected' : ''}>${m.name}</option>`
+                        ).join('');
+
+                } else if (field === 'costcenter') {
+                    inputEl = document.createElement('select');
+                    inputEl.innerHTML = '<option value="">— Sem centro de custo —</option>' +
+                        (this.db.costcenters || []).map(c =>
+                            `<option value="${c.id}" ${String(transaction.costcenter) === String(c.id) ? 'selected' : ''}>${c.name}</option>`
+                        ).join('');
+
+                } else if (field === 'supplier') {
+                    inputEl = document.createElement('select');
+                    const suppOpts = (this.db.suppliers || []).map(s =>
+                        `<option value="supplier:${s.id}" ${transaction.type === 'expense' && String(transaction.supplier) === String(s.id) ? 'selected' : ''}>${s.name} (Forn.)</option>`
+                    ).join('');
+                    const custOpts = (this.db.customers || []).map(c =>
+                        `<option value="customer:${c.id}" ${transaction.type === 'income' && String(transaction.customer) === String(c.id) ? 'selected' : ''}>${c.name} (Cli.)</option>`
+                    ).join('');
+                    inputEl.innerHTML = '<option value="">— Nenhum —</option>' + suppOpts + custOpts;
+
                 } else {
                     return; // campo não editável inline
                 }
@@ -5650,6 +5674,21 @@
                         update.date = val;
                     } else if (field === 'category') {
                         update.category = val;
+                    } else if (field === 'ministry') {
+                        update.ministry = val;
+                    } else if (field === 'costcenter') {
+                        update.costcenter = val;
+                    } else if (field === 'supplier') {
+                        if (val.startsWith('supplier:')) {
+                            update.supplier = val.replace('supplier:', '');
+                            update.customer = '';
+                        } else if (val.startsWith('customer:')) {
+                            update.customer = val.replace('customer:', '');
+                            update.supplier = '';
+                        } else {
+                            update.supplier = '';
+                            update.customer = '';
+                        }
                     }
 
                     this.db.updateTransaction(id, { ...transaction, ...update });
