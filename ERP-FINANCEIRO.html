@@ -6961,33 +6961,48 @@
 
                 sd(...DARK); doc.setLineWidth(0.5); doc.line(0, 31.5, W, 31.5); doc.setLineWidth(0.2);
 
+                // ── PRÉ-CALCULAR SALDOS REAIS DO PERÍODO ─────────────────────
+                const _allTrans2 = this.db.getTransactions({});
+                const _postPeriod2 = endDate ? _allTrans2.filter(t => t.reconciled && t.date > endDate) : [];
+                const _balAtEnd2 = currentBal + _postPeriod2.reduce((s,t) => s + (t.type==='expense' ? t.amount : -t.amount), 0);
+                const _saldoInicial = _balAtEnd2 - netCash;
+                const _saldoFinal   = _balAtEnd2;
+
                 // ── BLOCOS RESUMO ─────────────────────────────────────────────
-                const bW = CW / 3 - 3;
+                const bW = CW / 3 - 2;
                 const summaryBlocks = [
-                    { label:'TOTAL DE ENTRADAS',   val: this.formatCurrency(income),              sign:'+' },
-                    { label:'TOTAL DE SAÍDAS',     val: this.formatCurrency(expense),             sign:'-' },
-                    { label:'RESULTADO DO PERÍODO',val: this.formatCurrency(Math.abs(netCash)),   sign: netCash>=0?'+':'-' },
+                    { label:'TOTAL DE ENTRADAS',    val: this.formatCurrency(income),             sign:'+' },
+                    { label:'TOTAL DE SAÍDAS',      val: this.formatCurrency(expense),            sign:'-' },
+                    { label:'RESULTADO DO PERÍODO', val: this.formatCurrency(Math.abs(netCash)),  sign: netCash>=0?'+':'-' },
                 ];
                 summaryBlocks.forEach((b, i) => {
                     const x = ML + i * (bW + 3);
-                    sf(240,240,240); doc.rect(x, 34, bW, 14, 'F');
-                    sd(185,185,185); doc.setLineWidth(0.15); doc.rect(x, 34, bW, 14, 'S');
-                    sf(...DARK); doc.rect(x, 34, bW, 1.2, 'F');
-                    doc.setFontSize(6); doc.setFont('helvetica','bold'); st(90,90,90);
-                    doc.text(b.label, x + bW/2, 39, {align:'center'});
-                    doc.setFontSize(10); doc.setFont('helvetica','bold'); st(...DARK);
-                    doc.text(`${b.sign} ${b.val}`, x + bW/2, 45, {align:'center'});
+                    sf(240,240,240); doc.rect(x, 34, bW, 16, 'F');
+                    sd(185,185,185); doc.setLineWidth(0.15); doc.rect(x, 34, bW, 16, 'S');
+                    sf(...DARK); doc.rect(x, 34, bW, 1.5, 'F');
+                    doc.setFontSize(6.5); doc.setFont('helvetica','bold'); st(90,90,90);
+                    doc.text(b.label, x + bW/2, 40, {align:'center'});
+                    doc.setFontSize(11); doc.setFont('helvetica','bold'); st(...DARK);
+                    doc.text(`${b.sign} ${b.val}`, x + bW/2, 47.5, {align:'center'});
                 });
 
                 // ── BARRA DE SALDOS ───────────────────────────────────────────
-                sf(...DARK); doc.rect(ML, 50, CW, 7.5, 'F');
-                doc.setFontSize(7); doc.setFont('helvetica','bold'); st(210,210,210);
-                doc.text('SALDO INICIAL:', ML+4, 55);
-                st(255,255,255); doc.text(this.formatCurrency(initBal), ML+52, 55, {align:'right'});
-                st(210,210,210); doc.text('MOVIMENTAÇÃO:', ML + CW/2 - 5, 55);
-                st(255,255,255); doc.text(`${netCash>=0?'+ ':'- '}${this.formatCurrency(Math.abs(netCash))}`, ML + CW/2 + 45, 55, {align:'right'});
-                st(210,210,210); doc.text('SALDO ATUAL:', MR - 52, 55);
-                st(255,255,255); doc.text(this.formatCurrency(currentBal), MR, 55, {align:'right'});
+                const sbW = CW / 3;
+                const sbY = 53; const sbH = 11;
+                const saldoBlocks = [
+                    { label:'SALDO INICIAL',  val: this.formatCurrency(_saldoInicial) },
+                    { label:'MOVIMENTAÇÃO',   val: `${netCash>=0?'+ ':'- '}${this.formatCurrency(Math.abs(netCash))}` },
+                    { label:'SALDO FINAL',    val: this.formatCurrency(_saldoFinal) },
+                ];
+                saldoBlocks.forEach((b, i) => {
+                    const x = ML + i * sbW;
+                    sf(...DARK); doc.rect(x, sbY, sbW, sbH, 'F');
+                    if (i < 2) { sd(90,90,90); doc.setLineWidth(0.3); doc.line(x+sbW, sbY, x+sbW, sbY+sbH); }
+                    doc.setFontSize(6.5); doc.setFont('helvetica','normal'); st(190,220,215);
+                    doc.text(b.label, x + sbW/2, sbY + 4, {align:'center'});
+                    doc.setFontSize(9.5); doc.setFont('helvetica','bold'); st(255,255,255);
+                    doc.text(b.val, x + sbW/2, sbY + 9, {align:'center'});
+                });
 
                 // ── TABELA ────────────────────────────────────────────────────
                 // Busca robusta de fornecedor/cliente independente do tipo
@@ -7055,7 +7070,7 @@
                 doc.autoTable({
                     head: [['DATA','HISTÓRICO','NAT.','VALOR','SALDO BANCÁRIO','FORNECEDOR','CATEGORIA','MINISTÉRIO']],
                     body: tableData,
-                    startY: 60,
+                    startY: 67,
                     margin: { left: ML, right: 15 },
                     styles: {
                         fontSize: 6.5,
