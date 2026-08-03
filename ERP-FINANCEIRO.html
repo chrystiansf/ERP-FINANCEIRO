@@ -6998,7 +6998,7 @@
                     const x = ML + i * sbW;
                     sf(...DARK); doc.rect(x, sbY, sbW, sbH, 'F');
                     if (i < 2) { sd(90,90,90); doc.setLineWidth(0.3); doc.line(x+sbW, sbY, x+sbW, sbY+sbH); }
-                    doc.setFontSize(6.5); doc.setFont('helvetica','normal'); st(190,220,215);
+                    doc.setFontSize(6.5); doc.setFont('helvetica','normal'); st(255,255,255);
                     doc.text(b.label, x + sbW/2, sbY + 4, {align:'center'});
                     doc.setFontSize(9.5); doc.setFont('helvetica','bold'); st(255,255,255);
                     doc.text(b.val, x + sbW/2, sbY + 9, {align:'center'});
@@ -7089,15 +7089,16 @@
                         cellPadding: { top:3, bottom:3, left:2.5, right:2.5 },
                     },
                     alternateRowStyles: { fillColor: [246,246,246] },
+                    tableWidth: CW,
                     columnStyles: {
-                        0: { cellWidth:20, halign:'center' },
-                        1: { cellWidth:55 },
-                        2: { cellWidth:16, halign:'center', fontStyle:'bold' },
-                        3: { cellWidth:28, halign:'right',  fontStyle:'bold' },
-                        4: { cellWidth:28, halign:'right',  fontStyle:'bold' },
-                        5: { cellWidth:38 },
-                        6: { cellWidth:32 },
-                        7: { cellWidth:30 },
+                        0: { cellWidth:22,  halign:'center' },
+                        1: { cellWidth:62 },
+                        2: { cellWidth:18,  halign:'center', fontStyle:'bold' },
+                        3: { cellWidth:30,  halign:'right',  fontStyle:'bold' },
+                        4: { cellWidth:30,  halign:'right',  fontStyle:'bold' },
+                        5: { cellWidth:40 },
+                        6: { cellWidth:33 },
+                        7: { cellWidth:32 },
                     },
                     didParseCell: (data) => {
                         if (data.section !== 'body') return;
@@ -7106,10 +7107,9 @@
                         if (data.column.index === 2 || data.column.index === 3) {
                             data.cell.styles.textColor = row.type==='income' ? [30,120,60] : [180,30,30];
                         }
+                        // SALDO BANCÁRIO: sempre cinza escuro, sem cor verde/vermelho
                         if (data.column.index === 4) {
-                            const raw = (data.cell.text[0]||'').replace(/\s/g,'').replace(/\./g,'').replace(',','.');
-                            const num = parseFloat(raw.replace(/[^\d\-\.]/g,''));
-                            if (!isNaN(num)) data.cell.styles.textColor = num < 0 ? [180,30,30] : [30,120,60];
+                            data.cell.styles.textColor = [50,50,50];
                         }
                     },
                     didDrawPage: (data) => {
