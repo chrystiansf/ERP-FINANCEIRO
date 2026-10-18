@@ -1344,6 +1344,34 @@
         .cell-edit-wrap select:focus {
             outline: none;
         }
+        .desc-autocomplete {
+            position: absolute;
+            z-index: 9999;
+            background: var(--bg-card);
+            border: 1.5px solid var(--primary);
+            border-top: none;
+            border-radius: 0 0 6px 6px;
+            box-shadow: 0 6px 16px rgba(0,0,0,0.12);
+            max-height: 180px;
+            overflow-y: auto;
+            min-width: 260px;
+        }
+        .desc-autocomplete-item {
+            padding: 6px 10px;
+            font-size: 0.82rem;
+            color: var(--text-primary);
+            cursor: pointer;
+            border-bottom: 1px solid var(--border-color);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .desc-autocomplete-item:last-child { border-bottom: none; }
+        .desc-autocomplete-item:hover,
+        .desc-autocomplete-item.active {
+            background: var(--primary);
+            color: #fff;
+        }
         .cell-confirm-btn, .cell-cancel-btn {
             width: 24px;
             height: 24px;
@@ -5696,6 +5724,7 @@
                     inputEl = document.createElement('input');
                     inputEl.type = 'text';
                     inputEl.value = field === 'description' ? transaction.description : (transaction.notes || '');
+                    inputEl._isDescription = (field === 'description');
 
                 } else if (field === 'date') {
                     inputEl = document.createElement('input');
@@ -5758,7 +5787,75 @@
 
                 // Substituir display pelo editor
                 td.innerHTML = '';
+                td.style.position = 'relative';
                 td.appendChild(wrap);
+
+                // ── Autocomplete para campo descrição ─────────────────────────
+                if (inputEl._isDescription) {
+                    const allDescs = [...new Set(
+                        this.db.transactions
+                            .map(t => (t.description || '').trim())
+                            .filter(d => d.length > 0)
+                    )].sort();
+
+                    let acBox = null;
+                    let acActive = -1;
+
+                    const removeAc = () => { if (acBox) { acBox.remove(); acBox = null; acActive = -1; } };
+
+                    const renderAc = (q) => {
+                        removeAc();
+                        const matches = allDescs.filter(d => d.toLowerCase().includes(q.toLowerCase()) && d !== q);
+                        if (!matches.length) return;
+                        acBox = document.createElement('div');
+                        acBox.className = 'desc-autocomplete';
+                        acBox.style.width = inputEl.offsetWidth + 'px';
+                        matches.slice(0, 8).forEach((m, i) => {
+                            const item = document.createElement('div');
+                            item.className = 'desc-autocomplete-item';
+                            item.textContent = m;
+                            item.addEventListener('mousedown', (e) => {
+                                e.preventDefault();
+                                inputEl.value = m;
+                                removeAc();
+                            });
+                            acBox.appendChild(item);
+                        });
+                        wrap.appendChild(acBox);
+                    };
+
+                    inputEl.addEventListener('input', () => {
+                        acActive = -1;
+                        const q = inputEl.value.trim();
+                        if (q.length >= 2) renderAc(q); else removeAc();
+                    });
+
+                    inputEl.addEventListener('keydown', (e) => {
+                        if (!acBox) return;
+                        const items = acBox.querySelectorAll('.desc-autocomplete-item');
+                        if (e.key === 'ArrowDown') {
+                            e.preventDefault();
+                            acActive = Math.min(acActive + 1, items.length - 1);
+                            items.forEach((el, i) => el.classList.toggle('active', i === acActive));
+                        } else if (e.key === 'ArrowUp') {
+                            e.preventDefault();
+                            acActive = Math.max(acActive - 1, 0);
+                            items.forEach((el, i) => el.classList.toggle('active', i === acActive));
+                        } else if (e.key === 'Tab' || e.key === 'Enter') {
+                            if (acActive >= 0 && items[acActive]) {
+                                e.preventDefault();
+                                inputEl.value = items[acActive].textContent;
+                                removeAc();
+                            } else {
+                                removeAc();
+                            }
+                        } else if (e.key === 'Escape') {
+                            removeAc();
+                        }
+                    });
+
+                    inputEl.addEventListener('blur', () => setTimeout(removeAc, 150));
+                }
 
                 const save = () => {
                     let val = isSelect && window.jQuery && $(inputEl).data('select2')
