@@ -4,7 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ERP Financeiro - Conciliação Bancária</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;0,900;1,400&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
     <!-- Select2 para busca nos selects -->
@@ -12,34 +14,52 @@
     
     <style>
         :root {
-            --primary: #3B82F6;
-            --primary-dark: #1D4ED8;
-            --primary-light: #EFF6FF;
-            --secondary: #6B7280;
-            --success: #10B981;
-            --danger: #EF4444;
-            --warning: #F59E0B;
-            --info: #06B6D4;
+            /* CN Manaus brand palette */
+            --cn-green-900: #0D2B23;
+            --cn-green-800: #123A30;
+            --cn-green-700: #1E4D41;
+            --cn-green-600: #2C5A4F;
+            --cn-green-500: #4E7A6C;
+            --cn-green-400: #7AA89C;
+            --cn-green-100: #E3F0EC;
+            --cn-green-50:  #F0F5F2;
+            --cn-paper:     #F7F8F5;
+            --cn-ink:       #17221F;
+            --cn-border:    #DCE3DF;
+            --cn-gradient:  linear-gradient(170deg, #4E7A6C 0%, #2C5A4F 40%, #123A30 100%);
 
-            --bg-main: #F1F5F9;
-            --bg-sidebar: #FFFFFF;
-            --bg-card: #FFFFFF;
-            --bg-hover: #F8FAFC;
-            --bg-input: #FFFFFF;
+            /* Semantic aliases */
+            --primary:        #1E4D41;
+            --primary-dark:   #123A30;
+            --primary-light:  #E3F0EC;
+            --secondary:      #4E7A6C;
+            --success:        #1B6E46;
+            --danger:         #B4532A;
+            --warning:        #C68A00;
+            --info:           #2E6B8A;
 
-            --text-primary: #111827;
-            --text-secondary: #6B7280;
-            --text-muted: #9CA3AF;
+            --bg-main:    var(--cn-paper);
+            --bg-sidebar: var(--cn-green-700);
+            --bg-card:    #FFFFFF;
+            --bg-hover:   var(--cn-green-50);
+            --bg-input:   #FFFFFF;
 
-            --border-color: #E5E7EB;
-            --border-radius: 10px;
-            --border-radius-sm: 6px;
-            --border-radius-lg: 14px;
+            --text-primary:   var(--cn-ink);
+            --text-secondary: #4A5E57;
+            --text-muted:     #7A9087;
 
-            --shadow-sm: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
-            --shadow-md: 0 4px 6px -1px rgba(0,0,0,0.07), 0 2px 4px -1px rgba(0,0,0,0.04);
-            --shadow-lg: 0 10px 15px -3px rgba(0,0,0,0.08), 0 4px 6px -2px rgba(0,0,0,0.03);
-            --shadow-xl: 0 20px 25px -5px rgba(0,0,0,0.08), 0 10px 10px -5px rgba(0,0,0,0.02);
+            --border-color:      var(--cn-border);
+            --border-radius:     12px;
+            --border-radius-sm:  8px;
+            --border-radius-lg:  16px;
+
+            --shadow-sm: 0 1px 3px rgba(18,58,48,0.07), 0 1px 2px rgba(18,58,48,0.04);
+            --shadow-md: 0 4px 12px rgba(18,58,48,0.09), 0 2px 4px rgba(18,58,48,0.05);
+            --shadow-lg: 0 10px 24px rgba(18,58,48,0.10), 0 4px 8px rgba(18,58,48,0.06);
+            --shadow-xl: 0 20px 40px rgba(18,58,48,0.12), 0 8px 16px rgba(18,58,48,0.06);
+
+            --font-display: 'Playfair Display', Georgia, serif;
+            --font-ui:      'Manrope', system-ui, -apple-system, 'Segoe UI', sans-serif;
 
             --sidebar-width: 240px;
             --transition: 0.2s ease;
@@ -47,19 +67,20 @@
 
         /* ── Dark Theme ── */
         body.dark-theme {
-            --bg-main: #0F172A;
-            --bg-sidebar: #1E293B;
-            --bg-card: #1E293B;
-            --bg-hover: #334155;
-            --bg-input: #1E293B;
-            --text-primary: #F1F5F9;
-            --text-secondary: #94A3B8;
-            --text-muted: #64748B;
-            --border-color: #334155;
-            --primary-light: #1E3A5F;
-            --shadow-sm: 0 1px 3px rgba(0,0,0,0.3);
-            --shadow-md: 0 4px 6px -1px rgba(0,0,0,0.4);
-            --shadow-lg: 0 10px 15px -3px rgba(0,0,0,0.5);
+            --bg-main:    #0D1F1A;
+            --bg-sidebar: #071410;
+            --bg-card:    #122920;
+            --bg-hover:   #1A3530;
+            --bg-input:   #122920;
+            --text-primary:   #EEF3F0;
+            --text-secondary: #98B4AA;
+            --text-muted:     #5D7D72;
+            --border-color:   #1E4035;
+            --primary-light:  #1A3530;
+            --cn-green-50:    #1A3530;
+            --shadow-sm: 0 1px 3px rgba(0,0,0,0.4);
+            --shadow-md: 0 4px 12px rgba(0,0,0,0.5);
+            --shadow-lg: 0 10px 24px rgba(0,0,0,0.6);
         }
 
         * {
@@ -73,7 +94,7 @@
         }
 
         body {
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            font-family: var(--font-ui);
             background: var(--bg-main);
             color: var(--text-primary);
             line-height: 1.5;
@@ -89,20 +110,23 @@
 
         .sidebar {
             width: var(--sidebar-width);
-            background: var(--bg-sidebar);
-            border-right: 1px solid var(--border-color);
+            background: var(--cn-gradient);
+            border-right: none;
             display: flex;
             flex-direction: column;
             position: fixed;
             height: 100vh;
             z-index: 100;
-            box-shadow: var(--shadow-sm);
-            transition: background var(--transition), border-color var(--transition);
+            box-shadow: 4px 0 24px rgba(13,43,35,0.25);
+            transition: background var(--transition);
+        }
+        body.dark-theme .sidebar {
+            background: linear-gradient(170deg, #1A3530 0%, #0F2820 40%, #071410 100%);
         }
 
         .logo {
             padding: 1.25rem 1rem;
-            border-bottom: 1px solid var(--border-color);
+            border-bottom: 1px solid rgba(255,255,255,0.12);
             display: flex;
             align-items: center;
             gap: 0.75rem;
@@ -110,14 +134,15 @@
 
         .logo i {
             font-size: 1.5rem;
-            color: var(--primary);
+            color: rgba(255,255,255,0.9);
         }
 
         .logo h1 {
             font-size: 1rem;
             font-weight: 700;
-            color: var(--text-primary);
+            color: #FFFFFF;
             letter-spacing: -0.3px;
+            font-family: var(--font-display);
         }
 
         .nav-menu {
@@ -129,10 +154,10 @@
 
         .nav-section-label {
             font-size: 0.65rem;
-            font-weight: 600;
-            color: var(--text-muted);
+            font-weight: 700;
+            color: rgba(255,255,255,0.45);
             text-transform: uppercase;
-            letter-spacing: 0.8px;
+            letter-spacing: 1.2px;
             padding: 0.5rem 0.75rem 0.25rem;
             margin-top: 0.5rem;
         }
@@ -143,7 +168,7 @@
             gap: 0.75rem;
             padding: 0.6rem 0.75rem;
             margin-bottom: 0.125rem;
-            color: var(--text-secondary);
+            color: rgba(255,255,255,0.75);
             text-decoration: none;
             border-radius: var(--border-radius-sm);
             transition: all var(--transition);
@@ -160,26 +185,27 @@
         }
 
         .nav-item:hover {
-            background: var(--bg-hover);
-            color: var(--primary);
+            background: rgba(255,255,255,0.12);
+            color: #FFFFFF;
         }
 
         .nav-item.active {
-            background: var(--primary-light);
-            color: var(--primary);
-            font-weight: 600;
+            background: rgba(255,255,255,0.95);
+            color: var(--cn-green-700);
+            font-weight: 700;
         }
+        .nav-item.active i { color: var(--cn-green-700); }
 
         .sidebar-footer {
-            border-top: 1px solid var(--border-color);
-            background: var(--bg-card);
+            border-top: 1px solid rgba(255,255,255,0.12);
+            background: rgba(0,0,0,0.15);
         }
 
         .user-info {
             display: flex;
             align-items: center;
             gap: 0.75rem;
-            color: var(--text-secondary);
+            color: rgba(255,255,255,0.7);
             padding: 1rem 1.5rem;
         }
 
@@ -189,13 +215,13 @@
 
         .company-section, .backup-section {
             padding: 10px 12px;
-            border-top: 1px solid var(--border-color);
+            border-top: 1px solid rgba(255,255,255,0.1);
         }
 
         .section-label {
             font-size: 0.65rem;
-            color: var(--text-muted);
-            font-weight: 600;
+            color: rgba(255,255,255,0.5);
+            font-weight: 700;
             text-transform: uppercase;
             letter-spacing: 0.6px;
             margin-bottom: 6px;
@@ -274,6 +300,8 @@
             font-weight: 700;
             margin-bottom: 0.2rem;
             letter-spacing: -0.4px;
+            font-family: var(--font-display);
+            color: var(--cn-green-700);
         }
 
         .subtitle {
@@ -303,13 +331,13 @@
         }
 
         .btn-primary {
-            background: linear-gradient(135deg, var(--primary), #0052CC);
+            background: linear-gradient(135deg, var(--cn-green-600), var(--cn-green-800));
             color: white;
         }
 
         .btn-primary:hover {
             transform: translateY(-2px);
-            box-shadow: 0 10px 20px rgba(0, 102, 255, 0.3);
+            box-shadow: 0 8px 20px rgba(30,77,65,0.35);
         }
 
         .btn-secondary {
@@ -433,27 +461,27 @@
             align-items: center;
             justify-content: center;
             font-size: 1.75rem;
-            background: rgba(0, 102, 255, 0.1);
-            color: var(--primary);
+            background: var(--cn-green-100);
+            color: var(--cn-green-700);
         }
 
         .summary-card.income .card-icon {
-            background: rgba(16, 185, 129, 0.1);
+            background: #E3F1E8;
             color: var(--success);
         }
 
         .summary-card.expense .card-icon {
-            background: rgba(239, 68, 68, 0.1);
+            background: #F8E6DD;
             color: var(--danger);
         }
 
         .summary-card.balance .card-icon {
-            background: rgba(59, 130, 246, 0.1);
-            color: var(--info);
+            background: var(--cn-green-100);
+            color: var(--cn-green-600);
         }
 
         .summary-card.pending .card-icon {
-            background: rgba(245, 158, 11, 0.1);
+            background: #FEF3D0;
             color: var(--warning);
         }
 
@@ -470,7 +498,7 @@
         .card-value {
             font-size: 1.75rem;
             font-weight: 700;
-            font-family: 'JetBrains Mono', monospace;
+            font-family: var(--font-display);
             margin-bottom: 0.5rem;
         }
 
@@ -531,17 +559,17 @@
         }
 
         thead {
-            background: rgba(0, 102, 255, 0.05);
+            background: var(--cn-green-50);
         }
 
         th {
             padding: 0.75rem 1rem;
             text-align: left;
-            font-weight: 600;
-            color: var(--text-secondary);
+            font-weight: 700;
+            color: var(--cn-green-700);
             font-size: 0.7rem;
             text-transform: uppercase;
-            letter-spacing: 0.6px;
+            letter-spacing: 1px;
         }
 
         td {
@@ -660,7 +688,7 @@
         .filter-input:focus {
             outline: none;
             border-color: var(--primary);
-            box-shadow: 0 0 0 3px rgba(59,130,246,0.15);
+            box-shadow: 0 0 0 3px rgba(30,77,65,0.15);
         }
 
         .filter-select {
@@ -682,7 +710,7 @@
         .filter-select:focus {
             outline: none;
             border-color: var(--primary);
-            box-shadow: 0 0 0 3px rgba(59,130,246,0.15);
+            box-shadow: 0 0 0 3px rgba(30,77,65,0.15);
         }
 
         .recent-transactions {
@@ -742,12 +770,12 @@
         }
 
         .transaction-icon.income {
-            background: rgba(16, 185, 129, 0.1);
+            background: #E3F1E8;
             color: var(--success);
         }
 
         .transaction-icon.expense {
-            background: rgba(239, 68, 68, 0.1);
+            background: #F8E6DD;
             color: var(--danger);
         }
 
@@ -769,7 +797,7 @@
         .amount {
             font-size: 1.125rem;
             font-weight: 700;
-            font-family: 'JetBrains Mono', monospace;
+            font-family: var(--font-display);
         }
 
         .amount.income {
@@ -795,13 +823,13 @@
         }
 
         .status-badge.reconciled {
-            background: rgba(16, 185, 129, 0.1);
+            background: #E3F1E8;
             color: var(--success);
         }
 
         .status-badge.pending {
-            background: rgba(245, 158, 11, 0.1);
-            color: var(--warning);
+            background: #FEF3D0;
+            color: #8A6500;
         }
 
         .action-buttons {
@@ -857,7 +885,7 @@
             left: 0;
             width: 100%;
             height: 4px;
-            background: linear-gradient(90deg, var(--primary), #00D4FF);
+            background: var(--cn-gradient);
         }
 
         .account-card:hover {
@@ -876,12 +904,12 @@
             width: 50px;
             height: 50px;
             border-radius: 12px;
-            background: linear-gradient(135deg, rgba(0, 102, 255, 0.1), rgba(0, 212, 255, 0.1));
+            background: var(--cn-green-100);
             display: flex;
             align-items: center;
             justify-content: center;
             font-size: 1.5rem;
-            color: var(--primary);
+            color: var(--cn-green-700);
         }
 
         .account-info h3 {
@@ -907,8 +935,8 @@
         .balance-value {
             font-size: 2rem;
             font-weight: 700;
-            font-family: 'JetBrains Mono', monospace;
-            color: var(--primary);
+            font-family: var(--font-display);
+            color: var(--cn-green-700);
         }
 
         .reconciliation-container {
@@ -920,8 +948,8 @@
         }
 
         .info-card {
-            background: rgba(59, 130, 246, 0.1);
-            border: 1px solid rgba(59, 130, 246, 0.2);
+            background: var(--cn-green-100);
+            border: 1px solid var(--cn-green-400);
             border-radius: var(--border-radius);
             padding: 1.5rem;
             display: flex;
@@ -988,20 +1016,20 @@
         .report-card:hover {
             transform: translateY(-5px);
             box-shadow: var(--shadow-lg);
-            border-color: var(--primary);
+            border-color: var(--cn-green-600);
         }
 
         .report-icon {
             width: 70px;
             height: 70px;
             margin: 0 auto 1rem;
-            background: linear-gradient(135deg, rgba(0, 102, 255, 0.1), rgba(0, 212, 255, 0.1));
+            background: var(--cn-green-100);
             border-radius: 50%;
             display: flex;
             align-items: center;
             justify-content: center;
             font-size: 2rem;
-            color: var(--primary);
+            color: var(--cn-green-700);
         }
 
         .report-card h3 {
@@ -1138,7 +1166,7 @@
         .form-group textarea:focus {
             outline: none;
             border-color: var(--primary);
-            box-shadow: 0 0 0 3px rgba(0, 102, 255, 0.1);
+            box-shadow: 0 0 0 3px rgba(30,77,65,0.12);
         }
 
         .file-upload-area {
@@ -1152,12 +1180,12 @@
 
         .file-upload-area:hover {
             border-color: var(--primary);
-            background: rgba(0, 102, 255, 0.05);
+            background: var(--cn-green-50);
         }
 
         .file-upload-area i {
             font-size: 3rem;
-            color: var(--primary);
+            color: var(--cn-green-600);
             margin-bottom: 1rem;
         }
 
@@ -1207,8 +1235,8 @@
         }
 
         .info-box {
-            background: rgba(59, 130, 246, 0.1);
-            border: 1px solid rgba(59, 130, 246, 0.2);
+            background: var(--cn-green-100);
+            border: 1px solid var(--cn-green-400);
             border-radius: 10px;
             padding: 1rem;
             display: flex;
@@ -1217,7 +1245,7 @@
         }
 
         .info-box i {
-            color: var(--info);
+            color: var(--cn-green-600);
             font-size: 1.125rem;
         }
 
@@ -1407,7 +1435,7 @@
             position: sticky;
             top: 0;
             z-index: 2;
-            background: #f1f5f9;
+            background: var(--cn-green-50);
         }
         .import-preview-table-wrap td input,
         .import-preview-table-wrap td select {
@@ -1467,7 +1495,7 @@
 
         .select2-container--default.select2-container--focus .select2-selection--single {
             border-color: var(--primary);
-            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+            box-shadow: 0 0 0 3px rgba(30,77,65,0.12);
         }
 
         .select2-container--default .select2-selection--single .select2-selection__rendered {
@@ -1580,7 +1608,7 @@
         .summary-item-value {
             font-size: 1.75rem;
             font-weight: 700;
-            font-family: 'JetBrains Mono', monospace;
+            font-family: var(--font-display);
         }
 
         .summary-item-value.income {
@@ -1592,8 +1620,36 @@
         }
 
         .summary-item-value.balance {
-            color: var(--primary);
+            color: var(--cn-green-700);
         }
+
+        /* ===== CN-TICKET (saldo consolidado card) ===== */
+        .cn-ticket {
+            position: relative;
+            background: var(--cn-gradient);
+            color: #fff;
+            border-radius: 16px;
+            overflow: visible;
+        }
+        .cn-ticket::before,
+        .cn-ticket::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 20px;
+            height: 20px;
+            background: var(--bg-main);
+            border-radius: 50%;
+            z-index: 1;
+        }
+        .cn-ticket::before { left: -10px; }
+        .cn-ticket::after  { right: -10px; }
+        .cn-ticket .card-label  { color: rgba(255,255,255,0.75); }
+        .cn-ticket .card-value  { color: #fff; }
+        .cn-ticket .card-trend  { color: rgba(255,255,255,0.85); }
+        .cn-ticket .card-icon   { background: rgba(255,255,255,0.15); color: #fff; }
+        .cn-ticket .summary-card::before { display: none; }
     </style>
 </head>
 <body>
@@ -1756,7 +1812,7 @@
                         </div>
                     </div>
 
-                    <div class="summary-card balance">
+                    <div class="summary-card balance cn-ticket">
                         <div class="card-icon">
                             <i class="fas fa-wallet"></i>
                         </div>
@@ -2397,7 +2453,7 @@
 
                     <!-- RELATÓRIO COMPARATIVO -->
                     <div class="report-card" style="grid-column: 1 / -1;">
-                        <div class="report-icon" style="background: linear-gradient(135deg,rgba(16,185,129,0.12),rgba(59,130,246,0.12));">
+                        <div class="report-icon" style="background: var(--cn-green-100);">
                             <i class="fas fa-chart-bar" style="color:var(--success);"></i>
                         </div>
                         <h3>Comparativo Mensal</h3>
@@ -7785,7 +7841,7 @@ showComparativo() {
             datasets: [
                 { label: 'Entradas', data: data.map(d => d.receitas),  backgroundColor: 'rgba(16,185,129,0.75)', borderColor: '#10B981', borderWidth: 1.5, borderRadius: 4 },
                 { label: 'Saídas',   data: data.map(d => d.despesas),  backgroundColor: 'rgba(239,68,68,0.75)',  borderColor: '#EF4444', borderWidth: 1.5, borderRadius: 4 },
-                { label: 'Resultado',data: data.map(d => d.resultado), backgroundColor: data.map(d=>d.resultado>=0?'rgba(59,130,246,0.75)':'rgba(245,158,11,0.75)'), borderColor: data.map(d=>d.resultado>=0?'#3B82F6':'#F59E0B'), borderWidth: 1.5, borderRadius: 4 },
+                { label: 'Resultado',data: data.map(d => d.resultado), backgroundColor: data.map(d=>d.resultado>=0?'rgba(30,77,65,0.75)':'rgba(180,83,42,0.75)'), borderColor: data.map(d=>d.resultado>=0?'#1E4D41':'#B4532A'), borderWidth: 1.5, borderRadius: 4 },
             ]
         },
         options: {
@@ -8288,7 +8344,7 @@ exportCategoryToExcel(days, startDate, endDate) {
                     position: fixed;
                     top: 20px;
                     right: 20px;
-                    background: ${type === 'success' ? '#10B981' : type === 'error' ? '#EF4444' : '#0066FF'};
+                    background: ${type === 'success' ? '#1B6E46' : type === 'error' ? '#B4532A' : '#1E4D41'};
                     color: white;
                     padding: 1rem 1.5rem;
                     border-radius: 10px;
