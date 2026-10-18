@@ -8333,11 +8333,12 @@ exportCategoryToExcel(days, startDate, endDate) {
             }
 
             editSystemName() {
-                const currentName = document.getElementById('system-name').textContent;
+                const el = document.getElementById('system-name');
+                const currentName = el ? el.textContent : (localStorage.getItem('systemName') || '');
                 const newName = prompt('Digite o novo nome do sistema:', currentName);
-                
+
                 if (newName && newName.trim() !== '' && newName !== currentName) {
-                    document.getElementById('system-name').textContent = newName.trim();
+                    if (el) el.textContent = newName.trim();
                     localStorage.setItem('systemName', newName.trim());
                     this.showNotification('Nome do sistema atualizado!', 'success');
                 }
@@ -8346,7 +8347,8 @@ exportCategoryToExcel(days, startDate, endDate) {
             loadSystemName() {
                 const savedName = localStorage.getItem('systemName');
                 if (savedName) {
-                    document.getElementById('system-name').textContent = savedName;
+                    const el = document.getElementById('system-name');
+                    if (el) el.textContent = savedName;
                 }
                 this._updateLogoBtnLabel();
             }
