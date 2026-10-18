@@ -1260,7 +1260,7 @@
             }
             
             .filters-bar {
-                flex-direction: column;
+                grid-template-columns: 1fr 1fr;
             }
             
             .form-row {
@@ -1819,17 +1819,23 @@
                 </header>
 
                 <div class="filters-bar">
+                    <!-- Busca -->
                     <div class="filter-group">
-                        <input type="text" placeholder="Buscar transação..." class="filter-input" id="search-transaction">
+                        <label class="filter-label">Buscar</label>
+                        <input type="text" placeholder="Descrição, categoria..." class="filter-input" id="search-transaction">
                     </div>
+                    <!-- Tipo -->
                     <div class="filter-group">
+                        <label class="filter-label">Tipo</label>
                         <select class="filter-select" id="filter-type">
-                            <option value="">Todos os tipos</option>
+                            <option value="">Todos</option>
                             <option value="income">Entradas</option>
                             <option value="expense">Saídas</option>
                         </select>
                     </div>
+                    <!-- Período -->
                     <div class="filter-group">
+                        <label class="filter-label">Período</label>
                         <select class="filter-select" id="filter-period">
                             <option value="">Todos os períodos</option>
                             <option value="7">Últimos 7 dias</option>
@@ -1840,27 +1846,36 @@
                             <option value="custom">Período personalizado</option>
                         </select>
                     </div>
-                    <div class="filter-group" id="custom-date-range" style="display: none; grid-column: span 2;">
-                        <input type="date" class="filter-input" id="filter-start-date" placeholder="Data inicial">
-                        <input type="date" class="filter-input" id="filter-end-date" placeholder="Data final">
+                    <!-- Datas personalizadas -->
+                    <div class="filter-group filter-group-wide" id="custom-date-range" style="display:none;">
+                        <label class="filter-label">Intervalo de datas</label>
+                        <div class="date-row">
+                            <input type="date" class="filter-input" id="filter-start-date">
+                            <input type="date" class="filter-input" id="filter-end-date">
+                        </div>
                     </div>
+                    <!-- Conta -->
                     <div class="filter-group">
+                        <label class="filter-label">Conta</label>
                         <select class="filter-select" id="filter-account">
                             <option value="">Todas as contas</option>
                         </select>
                     </div>
+                    <!-- Status -->
                     <div class="filter-group">
+                        <label class="filter-label">Status</label>
                         <select class="filter-select" id="filter-status">
-                            <option value="">Todos os status</option>
+                            <option value="">Todos</option>
                             <option value="reconciled">Conciliadas</option>
                             <option value="pending">Pendentes</option>
                         </select>
                     </div>
-                    <!-- Multi-select: Categorias -->
+                    <!-- Categoria (multi-select) -->
                     <div class="filter-group">
+                        <label class="filter-label">Categoria</label>
                         <div class="ms-wrapper" id="ms-category-wrapper">
                             <div class="ms-trigger" onclick="app.msToggle('category')">
-                                <span id="ms-category-label">Todas as categorias</span>
+                                <span id="ms-category-label">Todas</span>
                                 <i class="fas fa-chevron-down"></i>
                             </div>
                             <div class="ms-dropdown" id="ms-category-dropdown">
@@ -1869,11 +1884,12 @@
                             </div>
                         </div>
                     </div>
-                    <!-- Multi-select: Ministérios -->
+                    <!-- Ministério (multi-select) -->
                     <div class="filter-group">
+                        <label class="filter-label">Ministério</label>
                         <div class="ms-wrapper" id="ms-ministry-wrapper">
                             <div class="ms-trigger" onclick="app.msToggle('ministry')">
-                                <span id="ms-ministry-label">Todos os ministérios</span>
+                                <span id="ms-ministry-label">Todos</span>
                                 <i class="fas fa-chevron-down"></i>
                             </div>
                             <div class="ms-dropdown" id="ms-ministry-dropdown">
@@ -1882,11 +1898,12 @@
                             </div>
                         </div>
                     </div>
-                    <!-- Multi-select: Centros de Custo -->
+                    <!-- Centro de Custo (multi-select) -->
                     <div class="filter-group">
+                        <label class="filter-label">Centro de Custo</label>
                         <div class="ms-wrapper" id="ms-costcenter-wrapper">
                             <div class="ms-trigger" onclick="app.msToggle('costcenter')">
-                                <span id="ms-costcenter-label">Todos os centros de custo</span>
+                                <span id="ms-costcenter-label">Todos</span>
                                 <i class="fas fa-chevron-down"></i>
                             </div>
                             <div class="ms-dropdown" id="ms-costcenter-dropdown">
@@ -1894,6 +1911,12 @@
                                 <div class="ms-list" id="ms-costcenter-list"></div>
                             </div>
                         </div>
+                    </div>
+                    <!-- Limpar filtros -->
+                    <div class="filter-group" style="display:flex;align-items:flex-end;">
+                        <button class="btn-clear-filters" onclick="app.clearTransactionFilters()" title="Limpar todos os filtros">
+                            <i class="fas fa-times-circle"></i> Limpar filtros
+                        </button>
                     </div>
                 </div>
 
@@ -5609,6 +5632,22 @@
 
                 // CALCULAR E EXIBIR TOTAIS
                 this.updateTransactionSummary(transactions);
+            }
+
+            clearTransactionFilters() {
+                const ids = ['search-transaction','filter-type','filter-period','filter-account','filter-status','filter-start-date','filter-end-date'];
+                ids.forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+                const cdr = document.getElementById('custom-date-range');
+                if (cdr) cdr.style.display = 'none';
+                // Reset multi-selects
+                ['category','ministry','costcenter'].forEach(k => {
+                    if (this.msSelected) this.msSelected[k] = null;
+                    const lbl = document.getElementById(`ms-${k}-label`);
+                    if (lbl) lbl.textContent = k === 'category' ? 'Todas' : 'Todos';
+                    const list = document.getElementById(`ms-${k}-list`);
+                    if (list) list.querySelectorAll('input[type=checkbox]').forEach(cb => { cb.checked = true; });
+                });
+                this.loadTransactions();
             }
 
             // NOVO MÉTODO: Atualizar resumo de transações
