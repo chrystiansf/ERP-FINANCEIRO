@@ -1717,14 +1717,15 @@
                         </button>
                     </div>
                 </div>
+
+                <button id="theme-toggle-btn" onclick="app.toggleTheme()" title="Alternar tema claro/escuro" style="width:100%;margin-top:10px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.18);border-radius:8px;padding:7px 12px;cursor:pointer;color:rgba(255,255,255,0.85);font-size:0.85rem;display:flex;align-items:center;justify-content:center;gap:8px;transition:background 0.2s;">
+                    <i class="fas fa-moon" id="theme-icon"></i>
+                    <span id="theme-label">Modo escuro</span>
+                </button>
             </div>
         </aside>
 
         <main class="main-content">
-            <!-- Theme toggle fixo no canto superior direito -->
-            <button id="theme-toggle-btn" onclick="app.toggleTheme()" title="Alternar tema claro/escuro" style="position:fixed;top:14px;right:18px;z-index:200;background:var(--bg-card);border:1.5px solid var(--border-color);border-radius:8px;padding:6px 12px;cursor:pointer;color:var(--text-secondary);font-size:0.9rem;transition:all 0.2s;box-shadow:0 2px 8px rgba(0,0,0,0.08);">
-                <i class="fas fa-moon" id="theme-icon"></i>
-            </button>
 
             <!-- Dashboard Page -->
             <div id="dashboard-page" class="page active">
@@ -3897,6 +3898,8 @@
                     document.body.classList.add('dark-theme');
                     const icon = document.getElementById('theme-icon');
                     if (icon) icon.className = 'fas fa-sun';
+                    const lbl = document.getElementById('theme-label');
+                    if (lbl) lbl.textContent = 'Modo claro';
                 }
                 this.setupBulkDelete(); // NOVA FUNÇÃO
                 this.loadDashboard();
@@ -5015,6 +5018,8 @@
                 localStorage.setItem('theme', isDark ? 'dark' : 'light');
                 const icon = document.getElementById('theme-icon');
                 if (icon) icon.className = isDark ? 'fas fa-sun' : 'fas fa-moon';
+                const lbl = document.getElementById('theme-label');
+                if (lbl) lbl.textContent = isDark ? 'Modo claro' : 'Modo escuro';
             }
 
             populateMonthFilter() {
@@ -7663,7 +7668,7 @@ exportCategoryToPDF(days, startDate, endDate, observacao = '') {
 
     // ── RESULTADO DO PERÍODO ──────────────────────────────────────────────────
     checkPage(55);
-    sd(...DARK); doc.setLineWidth(0.5);
+    sd(...CN_BORDER); doc.setLineWidth(0.5);
     doc.line(ML, y, MR, y);
     doc.setLineWidth(0.2);
     y += 5;
