@@ -7677,7 +7677,7 @@ exportCategoryToPDF(days, startDate, endDate, observacao = '') {
     doc.setFontSize(9); doc.setFont('helvetica','normal'); st(...CN_100);
     doc.text('(=)   RESULTADO LÍQUIDO DO PERÍODO', ML+5, y+6);
     doc.setFontSize(12); doc.setFont('helvetica','bold'); st(resultado>=0?[180,230,195]:[255,170,140]);
-    doc.text(`${resultado>=0?'+ ':'− '}${this.formatCurrency(Math.abs(resultado))}`, MR, y+11, {align:'right'});
+    doc.text(`${resultado>=0?'+ ':'- '}${this.formatCurrency(Math.abs(resultado))}`, MR, y+11, {align:'right'});
     y += 16;
 
     // ── SALDO FINAL DAS CONTAS ────────────────────────────────────────────────
@@ -7687,7 +7687,7 @@ exportCategoryToPDF(days, startDate, endDate, observacao = '') {
     doc.setFontSize(8.5); doc.setFont('helvetica','normal'); st(...CN_TEXT2);
     doc.text('SALDO DA CONTA BANCÁRIA', ML+4, y+6.5);
     doc.setFont('helvetica','bold'); st(...CN_DARK);
-    doc.text(`${saldoFinal>=0?'+ ':'− '}${this.formatCurrency(Math.abs(saldoFinal))}`, MR, y+6.5, {align:'right'});
+    doc.text(`${saldoFinal>=0?'+ ':'- '}${this.formatCurrency(Math.abs(saldoFinal))}`, MR, y+6.5, {align:'right'});
     y += 13;
 
     // ── OBSERVAÇÃO ───────────────────────────────────────────────────────────
@@ -7961,10 +7961,10 @@ exportComparativoPDF() {
         doc.setFont('helvetica','normal'); st(...CN_IN);
         doc.text(`+ ${this.formatCurrency(d.receitas)}`, cols[1]+colW[1]/2, y+5.2, {align:'center'});
         st(...CN_OUT);
-        doc.text(`− ${this.formatCurrency(d.despesas)}`, cols[2]+colW[2]/2, y+5.2, {align:'center'});
+        doc.text(`- ${this.formatCurrency(d.despesas)}`, cols[2]+colW[2]/2, y+5.2, {align:'center'});
         d.resultado>=0 ? st(...CN_IN) : st(...CN_OUT);
         doc.setFont('helvetica','bold');
-        doc.text(`${d.resultado>=0?'+ ':'− '}${this.formatCurrency(Math.abs(d.resultado))}`, cols[3]+colW[3]/2, y+5.2, {align:'center'});
+        doc.text(`${d.resultado>=0?'+ ':'- '}${this.formatCurrency(Math.abs(d.resultado))}`, cols[3]+colW[3]/2, y+5.2, {align:'center'});
         y += 8;
     });
 
@@ -7978,8 +7978,8 @@ exportComparativoPDF() {
     doc.setFontSize(8.5); doc.setFont('helvetica','bold'); st(255,255,255);
     doc.text('TOTAL DO PERÍODO', cols[0]+2, y+6);
     doc.text(`+ ${this.formatCurrency(totRec)}`,  cols[1]+colW[1]/2, y+6, {align:'center'});
-    doc.text(`− ${this.formatCurrency(totDesp)}`, cols[2]+colW[2]/2, y+6, {align:'center'});
-    doc.text(`${totRes>=0?'+ ':'− '}${this.formatCurrency(Math.abs(totRes))}`, cols[3]+colW[3]/2, y+6, {align:'center'});
+    doc.text(`- ${this.formatCurrency(totDesp)}`, cols[2]+colW[2]/2, y+6, {align:'center'});
+    doc.text(`${totRes>=0?'+ ':'- '}${this.formatCurrency(Math.abs(totRes))}`, cols[3]+colW[3]/2, y+6, {align:'center'});
     y += 13;
 
     // ── OBSERVAÇÃO ────────────────────────────────────────────────────────────
