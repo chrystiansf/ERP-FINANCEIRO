@@ -7781,17 +7781,17 @@ _compRemoveMonth(key) {
 
 _compCalcData() {
     const months = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
-    const currentBal = (this.db.accounts || []).reduce((s,a)=>s+(parseFloat(a.current_balance)||0), 0);
+    const initBal = (this.db.accounts || []).reduce((s,a) => s + (parseFloat(a.initial_balance)||0), 0);
     const allTrans = this.db.getTransactions({});
     return this._compSelectedMonths.map(key => {
         const [y,m] = key.split('-');
         const all = allTrans.filter(t => t.date && t.date.startsWith(key));
         const receitas = all.filter(t => t.type==='income').reduce((s,t)=>s+t.amount,0);
         const despesas = all.filter(t => t.type==='expense').reduce((s,t)=>s+t.amount,0);
-        // Saldo bancário no último dia do mês: saldo atual + efeito reverso das transações conciliadas posteriores
+        // Saldo = saldo inicial das contas + todas as transações lançadas até o último dia do mês
         const lastDay = `${y}-${m}-${new Date(parseInt(y), parseInt(m), 0).getDate()}`;
-        const transAfter = allTrans.filter(t => t.date > lastDay);
-        const saldo = currentBal + transAfter.reduce((s,t) => s + (t.type==='expense' ? t.amount : -t.amount), 0);
+        const transUpTo = allTrans.filter(t => t.date <= lastDay);
+        const saldo = initBal + transUpTo.reduce((s,t) => s + (t.type==='income' ? t.amount : -t.amount), 0);
         return { key, label: `${months[parseInt(m)-1]}/${y}`, receitas, despesas, resultado: receitas - despesas, saldo };
     });
 }
