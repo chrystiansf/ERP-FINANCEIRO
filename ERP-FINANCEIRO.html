@@ -5354,6 +5354,14 @@
                             <p style="margin:0 0 16px;color:var(--text-secondary);font-size:0.9rem;">
                                 <strong style="color:var(--text-primary);">${total} transação(ões)</strong> selecionada(s) — ${typeInfo}
                             </p>
+                            <div class="form-group" style="margin-bottom:16px;">
+                                <label style="font-weight:600;margin-bottom:6px;display:block;">Aplicar em</label>
+                                <select id="bulk-classify-type-filter" style="width:100%;padding:0.75rem 1rem;background:var(--bg-input);border:1px solid var(--border-color);border-radius:10px;color:var(--text-primary);font-size:0.9rem;">
+                                    <option value="all">Todas as selecionadas</option>
+                                    <option value="income">Somente Entradas</option>
+                                    <option value="expense">Somente Saídas</option>
+                                </select>
+                            </div>
                             <div class="form-group" style="margin-bottom:20px;">
                                 <label style="font-weight:600;margin-bottom:6px;display:block;">Nova Categoria</label>
                                 <select id="bulk-classify-category-select" style="width:100%;padding:0.75rem 1rem;background:var(--bg-input);border:1px solid var(--border-color);border-radius:10px;color:var(--text-primary);font-size:0.9rem;">
@@ -5377,11 +5385,14 @@
                 const sel = document.getElementById('bulk-classify-category-select');
                 if (!sel || !sel.value) { this.showNotification('Selecione uma categoria.', 'warning'); return; }
                 const categoryId = sel.value;
+                const typeFilter = document.getElementById('bulk-classify-type-filter')?.value || 'all';
                 const ids = Array.from(this.selectedTransactions);
                 let ok = 0;
                 ids.forEach(id => {
                     const t = this.db.transactions.find(t => t.id === id);
-                    if (t) { t.category = categoryId; ok++; }
+                    if (!t) return;
+                    if (typeFilter !== 'all' && t.type !== typeFilter) return;
+                    t.category = categoryId; ok++;
                 });
                 this.db.save();
                 document.getElementById('bulk-classify-modal')?.remove();
