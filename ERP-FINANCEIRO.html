@@ -7781,12 +7781,18 @@ _compRemoveMonth(key) {
 
 _compCalcData() {
     const months = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+    const currentBal = (this.db.accounts || []).reduce((s,a)=>s+(parseFloat(a.current_balance)||0), 0);
+    const allTrans = this.db.getTransactions({});
     return this._compSelectedMonths.map(key => {
         const [y,m] = key.split('-');
-        const all = this.db.getTransactions({}).filter(t => t.date && t.date.startsWith(key));
+        const all = allTrans.filter(t => t.date && t.date.startsWith(key));
         const receitas = all.filter(t => t.type==='income').reduce((s,t)=>s+t.amount,0);
         const despesas = all.filter(t => t.type==='expense').reduce((s,t)=>s+t.amount,0);
-        return { key, label: `${months[parseInt(m)-1]}/${y}`, receitas, despesas, resultado: receitas - despesas };
+        // Saldo bancário no último dia do mês: saldo atual + efeito reverso das transações conciliadas posteriores
+        const lastDay = `${y}-${m}-${new Date(parseInt(y), parseInt(m), 0).getDate()}`;
+        const transAfter = allTrans.filter(t => t.reconciled && t.date > lastDay);
+        const saldo = currentBal + transAfter.reduce((s,t) => s + (t.type==='expense' ? t.amount : -t.amount), 0);
+        return { key, label: `${months[parseInt(m)-1]}/${y}`, receitas, despesas, resultado: receitas - despesas, saldo };
     });
 }
 
@@ -7808,6 +7814,7 @@ showComparativo() {
                 <th style="padding:7px 10px;text-align:right;border:1px solid #DCE3DF;font-weight:700;color:#1B6E46;font-size:0.72rem;text-transform:uppercase;">Entradas</th>
                 <th style="padding:7px 10px;text-align:right;border:1px solid #DCE3DF;font-weight:700;color:#9A4320;font-size:0.72rem;text-transform:uppercase;">Saídas</th>
                 <th style="padding:7px 10px;text-align:right;border:1px solid #DCE3DF;font-weight:700;color:#10302A;font-size:0.72rem;text-transform:uppercase;">Resultado</th>
+                <th style="padding:7px 10px;text-align:right;border:1px solid #DCE3DF;font-weight:700;color:#10302A;font-size:0.72rem;text-transform:uppercase;">Saldo Bancário</th>
             </tr>
         </thead>
         <tbody>
@@ -7816,6 +7823,7 @@ showComparativo() {
                 <td style="padding:7px 10px;border:1px solid var(--border-color);text-align:right;color:var(--success);font-weight:600;">+ ${this.formatCurrency(d.receitas)}</td>
                 <td style="padding:7px 10px;border:1px solid var(--border-color);text-align:right;color:var(--danger);font-weight:600;">- ${this.formatCurrency(d.despesas)}</td>
                 <td style="padding:7px 10px;border:1px solid var(--border-color);text-align:right;font-weight:700;color:${d.resultado>=0?'var(--success)':'var(--danger)'};">${d.resultado>=0?'+ ':'- '}${this.formatCurrency(Math.abs(d.resultado))}</td>
+                <td style="padding:7px 10px;border:1px solid var(--border-color);text-align:right;font-weight:700;color:var(--text-primary);">${this.formatCurrency(d.saldo)}</td>
             </tr>`).join('')}
         </tbody>
     </table>`;
@@ -7941,12 +7949,12 @@ exportComparativoPDF() {
     }
 
     // ── TABELA ────────────────────────────────────────────────────────────────
-    const colW = [30, CW/4+5, CW/4+5, CW/4+5];
-    const cols = [ML, ML+colW[0], ML+colW[0]+colW[1], ML+colW[0]+colW[1]+colW[2]];
+    const colW = [27, 35, 35, 35, 38];
+    const cols = [ML, ML+colW[0], ML+colW[0]+colW[1], ML+colW[0]+colW[1]+colW[2], ML+colW[0]+colW[1]+colW[2]+colW[3]];
     if (y > H-40) { doc.addPage(); y=15; }
     sf(...CN_PRI); doc.rect(ML, y, CW, 8, 'F');
     doc.setFontSize(7.5); doc.setFont('helvetica','bold'); st(255,255,255);
-    ['MÊS','ENTRADAS','SAÍDAS','RESULTADO'].forEach((h,i) => {
+    ['MÊS','ENTRADAS','SAÍDAS','RESULTADO','SALDO BANCÁRIO'].forEach((h,i) => {
         doc.text(h, cols[i] + (i===0?2:colW[i]/2), y+5.2, {align: i===0?'left':'center'});
     });
     y += 9;
@@ -7965,6 +7973,8 @@ exportComparativoPDF() {
         d.resultado>=0 ? st(...CN_IN) : st(...CN_OUT);
         doc.setFont('helvetica','bold');
         doc.text(`${d.resultado>=0?'+ ':'- '}${this.formatCurrency(Math.abs(d.resultado))}`, cols[3]+colW[3]/2, y+5.2, {align:'center'});
+        st(...CN_TEXT); doc.setFont('helvetica','bold');
+        doc.text(this.formatCurrency(d.saldo), cols[4]+colW[4]/2, y+5.2, {align:'center'});
         y += 8;
     });
 
@@ -7974,12 +7984,14 @@ exportComparativoPDF() {
     const totRec  = data.reduce((s,d)=>s+d.receitas,0);
     const totDesp = data.reduce((s,d)=>s+d.despesas,0);
     const totRes  = data.reduce((s,d)=>s+d.resultado,0);
+    const lastSaldo = data.length > 0 ? data[data.length-1].saldo : 0;
     sf(...CN_DARK); doc.rect(ML, y, CW, 9, 'F');
     doc.setFontSize(8.5); doc.setFont('helvetica','bold'); st(255,255,255);
     doc.text('TOTAL DO PERÍODO', cols[0]+2, y+6);
     doc.text(`+ ${this.formatCurrency(totRec)}`,  cols[1]+colW[1]/2, y+6, {align:'center'});
     doc.text(`- ${this.formatCurrency(totDesp)}`, cols[2]+colW[2]/2, y+6, {align:'center'});
     doc.text(`${totRes>=0?'+ ':'- '}${this.formatCurrency(Math.abs(totRes))}`, cols[3]+colW[3]/2, y+6, {align:'center'});
+    doc.text(this.formatCurrency(lastSaldo), cols[4]+colW[4]/2, y+6, {align:'center'});
     y += 13;
 
     // ── OBSERVAÇÃO ────────────────────────────────────────────────────────────
