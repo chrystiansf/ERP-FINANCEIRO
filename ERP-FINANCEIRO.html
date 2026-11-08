@@ -7790,7 +7790,7 @@ _compCalcData() {
         const despesas = all.filter(t => t.type==='expense').reduce((s,t)=>s+t.amount,0);
         // Saldo bancário no último dia do mês: saldo atual + efeito reverso das transações conciliadas posteriores
         const lastDay = `${y}-${m}-${new Date(parseInt(y), parseInt(m), 0).getDate()}`;
-        const transAfter = allTrans.filter(t => t.reconciled && t.date > lastDay);
+        const transAfter = allTrans.filter(t => t.date > lastDay);
         const saldo = currentBal + transAfter.reduce((s,t) => s + (t.type==='expense' ? t.amount : -t.amount), 0);
         return { key, label: `${months[parseInt(m)-1]}/${y}`, receitas, despesas, resultado: receitas - despesas, saldo };
     });
