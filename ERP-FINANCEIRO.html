@@ -1857,6 +1857,10 @@
                             <i class="fas fa-check-double"></i>
                             Conciliar Selecionadas (<span id="bulk-reconcile-transactions-count">0</span>)
                         </button>
+                        <button class="btn btn-secondary" id="bulk-classify-btn" style="display: none;" onclick="app.openBulkClassifyModal()">
+                            <i class="fas fa-tag"></i>
+                            Classificar Categoria (<span id="bulk-classify-count">0</span>)
+                        </button>
                         <button class="btn btn-secondary" id="import-btn">
                             <i class="fas fa-file-import"></i>
                             Importar Extrato
@@ -5191,12 +5195,14 @@
                 }
             }
 
-            // Atualizar botões de ação em lote (excluir + conciliar)
+            // Atualizar botões de ação em lote (excluir + conciliar + classificar)
             updateBulkDeleteButton() {
                 const deleteBtn        = document.getElementById('delete-selected-btn');
                 const reconcileBtn     = document.getElementById('bulk-reconcile-transactions-btn');
+                const classifyBtn      = document.getElementById('bulk-classify-btn');
                 const countSpan        = document.getElementById('selected-count');
                 const reconcileCount   = document.getElementById('bulk-reconcile-transactions-count');
+                const classifyCount    = document.getElementById('bulk-classify-count');
 
                 const total = this.selectedTransactions.size;
 
@@ -5218,6 +5224,15 @@
                     reconcileCount.textContent  = pendingSelected;
                 } else {
                     reconcileBtn.style.display  = 'none';
+                }
+
+                if (classifyBtn) {
+                    if (total > 0) {
+                        classifyBtn.style.display = 'inline-flex';
+                        classifyCount.textContent = total;
+                    } else {
+                        classifyBtn.style.display = 'none';
+                    }
                 }
             }
 
@@ -5303,6 +5318,79 @@
                 this.loadTransactions();
                 this.loadDashboard();
                 this.loadAccounts();
+            }
+
+            openBulkClassifyModal() {
+                const total = this.selectedTransactions.size;
+                if (total === 0) { this.showNotification('Nenhuma transação selecionada.', 'warning'); return; }
+
+                const categories = this.db.getCategories ? this.db.getCategories() : (this.db.categories || []);
+                const opts = categories.map(c => `<option value="${c.id}">${this._escapeHtml(c.name)}</option>`).join('');
+
+                // Tipos das selecionadas
+                const ids = Array.from(this.selectedTransactions);
+                const incomeCount  = ids.filter(id => { const t = this.db.transactions.find(t=>t.id===id); return t && t.type==='income'; }).length;
+                const expenseCount = ids.filter(id => { const t = this.db.transactions.find(t=>t.id===id); return t && t.type==='expense'; }).length;
+                const typeInfo = incomeCount > 0 && expenseCount > 0
+                    ? `${incomeCount} entrada(s) e ${expenseCount} saída(s)`
+                    : incomeCount > 0 ? `${incomeCount} entrada(s)` : `${expenseCount} saída(s)`;
+
+                const existing = document.getElementById('bulk-classify-modal');
+                if (existing) existing.remove();
+
+                const modal = document.createElement('div');
+                modal.id = 'bulk-classify-modal';
+                modal.className = 'modal';
+                modal.style.display = 'flex';
+                modal.innerHTML = `
+                    <div class="modal-content" style="max-width:420px;">
+                        <div class="modal-header">
+                            <h3><i class="fas fa-tag" style="margin-right:8px;"></i>Classificar Categoria em Massa</h3>
+                            <button class="btn-close" onclick="document.getElementById('bulk-classify-modal').remove()">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </div>
+                        <div style="padding:20px 24px;">
+                            <p style="margin:0 0 16px;color:var(--text-secondary);font-size:0.9rem;">
+                                <strong style="color:var(--text-primary);">${total} transação(ões)</strong> selecionada(s) — ${typeInfo}
+                            </p>
+                            <div class="form-group" style="margin-bottom:20px;">
+                                <label style="font-weight:600;margin-bottom:6px;display:block;">Nova Categoria</label>
+                                <select id="bulk-classify-category-select" style="width:100%;padding:0.75rem 1rem;background:var(--bg-input);border:1px solid var(--border-color);border-radius:10px;color:var(--text-primary);font-size:0.9rem;">
+                                    <option value="">— Selecione uma categoria —</option>
+                                    ${opts}
+                                </select>
+                            </div>
+                            <div style="display:flex;gap:10px;">
+                                <button class="btn btn-secondary" style="flex:1;" onclick="document.getElementById('bulk-classify-modal').remove()">Cancelar</button>
+                                <button class="btn btn-primary" style="flex:1;" onclick="app.bulkClassifyCategory()">
+                                    <i class="fas fa-check"></i> Aplicar
+                                </button>
+                            </div>
+                        </div>
+                    </div>`;
+                document.body.appendChild(modal);
+                modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
+            }
+
+            bulkClassifyCategory() {
+                const sel = document.getElementById('bulk-classify-category-select');
+                if (!sel || !sel.value) { this.showNotification('Selecione uma categoria.', 'warning'); return; }
+                const categoryId = sel.value;
+                const ids = Array.from(this.selectedTransactions);
+                let ok = 0;
+                ids.forEach(id => {
+                    const t = this.db.transactions.find(t => t.id === id);
+                    if (t) { t.category = categoryId; ok++; }
+                });
+                this.db.save();
+                document.getElementById('bulk-classify-modal')?.remove();
+                this.selectedTransactions.clear();
+                const selectAll = document.getElementById('select-all-transactions');
+                if (selectAll) selectAll.checked = false;
+                this.showNotification(`✅ Categoria aplicada em ${ok} transação(ões).`, 'success');
+                this.updateBulkDeleteButton();
+                this.loadTransactions();
             }
 
             loadDashboard() {
