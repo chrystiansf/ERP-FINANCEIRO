@@ -7890,242 +7890,188 @@ exportCategoryReport(format) {
 
 
 
-exportCategoryToPDF(days, startDate, endDate, observacao = '') {
+exportCategoryToPDF(days, startDate, endDate, observacao) {
+    observacao = observacao || '';
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF('portrait', 'mm', 'a4');
 
-    // jsPDF helvetica only covers Latin-1 (0x00–0xFF). Any char above 0xFF in an
-    // aligned doc.text() call causes NaN in getStringUnitWidth → f3(NaN) → crash.
-    // Patch doc.text to sanitize every string before it reaches the font metrics table.
-    const _origText = doc.text.bind(doc);
-    doc.text = function(txt, x, y, opts, transform) {
-        const san = s => String(s == null ? '' : s)
-            .replace(/ | |⁠/g, ' ')  // narrow/figure no-break space
-            .replace(/ /g, ' ')                // regular no-break space
-            .replace(/−/g, '-')                // Unicode minus sign
-            .replace(/–|—/g, '-')         // en-dash / em-dash
-            .replace(/[^\x20-\xFF]/g, '');          // strip anything else outside Latin-1
-        if (Array.isArray(txt)) txt = txt.map(san);
-        else txt = san(txt);
-        return _origText(txt, x, y, opts, transform);
-    };
-
+    // --- Dados ---
     let transactions, periodText;
     if (startDate && endDate) {
         transactions = this.db.getTransactions({}).filter(t => t.date >= startDate && t.date <= endDate);
-        periodText = `${this.formatDate(startDate)} a ${this.formatDate(endDate)}`;
+        const d1 = startDate.split('-'); const d2 = endDate.split('-');
+        periodText = d1[2]+'/'+d1[1]+'/'+d1[0]+' a '+d2[2]+'/'+d2[1]+'/'+d2[0];
     } else {
-        transactions = this.db.getTransactions({ days });
-        periodText = `Últimos ${days} dias`;
+        transactions = this.db.getTransactions({ days: days });
+        periodText = 'Ultimos '+days+' dias';
     }
 
     const receitas = {}; const despesas = {};
-    transactions.forEach(t => {
-        const cat  = this.db.getCategory(parseInt(t.category));
-        const name = cat ? cat.name : 'Sem Classificação';
-        if (t.type==='income') receitas[name] = (receitas[name]||0) + t.amount;
-        else                   despesas[name] = (despesas[name]||0) + t.amount;
-    });
+    transactions.forEach(function(t) {
+        const catObj = this.db.getCategory(parseInt(t.category));
+        const name = catObj ? catObj.name : 'Sem Classificacao';
+        if (t.type === 'income') receitas[name] = (receitas[name]||0) + t.amount;
+        else                     despesas[name] = (despesas[name]||0) + t.amount;
+    }.bind(this));
 
     const totalRec  = Object.values(receitas).reduce((s,v)=>s+v, 0);
     const totalDesp = Object.values(despesas).reduce((s,v)=>s+v, 0);
     const resultado = totalRec - totalDesp;
 
-    // Saldo da conta bancária ao final do período do relatório:
-    // Parte do saldo atual e reverte as transações reconciliadas posteriores à data final.
-    const allAccounts   = this.db.getAccounts ? this.db.getAccounts() : (this.db.accounts || []);
-    const saldoAtual    = allAccounts.reduce((s, a) => s + (parseFloat(a.current_balance) || 0), 0);
-    const todasTrans    = this.db.getTransactions({});
-    const transPostPeriodo = todasTrans.filter(t => t.reconciled && t.date > endDate);
-    const ajuste = transPostPeriodo.reduce((s, t) => {
-        return s + (t.type === 'income' ? -t.amount : t.amount);
-    }, 0);
+    // Saldo bancario: reverte transacoes reconciliadas apos o periodo
+    const allAccounts = this.db.getAccounts ? this.db.getAccounts() : (this.db.accounts || []);
+    const saldoAtual  = allAccounts.reduce((s,a) => s + (parseFloat(a.current_balance)||0), 0);
+    const todasTrans  = this.db.getTransactions({});
+    const efDate = endDate || '';
+    const ajuste = todasTrans.filter(t => t.reconciled && t.date > efDate).reduce((s,t) => s + (t.type==='income'?-t.amount:t.amount), 0);
     const saldoFinal = saldoAtual + ajuste;
 
-    const systemName  = localStorage.getItem('systemName') || 'ERP Financeiro';
-    const logoData    = this.getCompanyLogo();
+    // Formatador ASCII puro — sem Intl, sem Unicode
+    const fc = function(v) {
+        if (!isFinite(v)) return 'R$ 0,00';
+        const c = Math.round(Math.abs(v) * 100);
+        const intStr = Math.floor(c/100).toString().replace(/\B(?=(\d{3})+(?!\d))/g,'.');
+        return 'R$ '+intStr+','+(c%100).toString().padStart(2,'0');
+    };
 
-    const W = 210; const H = 297;
-    const ML = 20; const MR = W - 20; const CW = MR - ML;
+    const W=210, H=297, ML=14, MR=196, CW=182;
+    const CN_DARK=[16,48,42], CN_PRI=[30,77,65], CN_LIGHT=[240,245,242];
+    const CN_TEXT=[23,34,31], CN_TEXT2=[79,93,88], CN_BORDER=[220,227,223];
+    const CN_ZEBRA=[247,249,248], CN_IN=[27,110,70], CN_OUT=[154,67,32];
+    const CN_100=[223,234,229];
+    const sf = function(r,g,b){doc.setFillColor(r,g,b);};
+    const st = function(r,g,b){doc.setTextColor(r,g,b);};
+    const sd = function(r,g,b){doc.setDrawColor(r,g,b);};
 
-    const sf = (r,g,b) => doc.setFillColor(r,g,b);
-    const st = (r,g,b) => doc.setTextColor(r,g,b);
-    const sd = (r,g,b) => doc.setDrawColor(r,g,b);
-
-    const CN_DARK   = [16,48,42];
-    const CN_PRI    = [30,77,65];
-    const CN_TEXT   = [23,34,31];
-    const CN_TEXT2  = [79,93,88];
-    const CN_BORDER = [220,227,223];
-    const CN_DIV    = [230,236,233];
-    const CN_ZEBRA  = [247,249,248];
-    const CN_IN     = [27,110,70];
-    const CN_OUT    = [154,67,32];
-    const CN_100    = [223,234,229];
-    const CN_LIGHT  = [240,245,242];
-
-    const logoBranca = document.querySelector('.logo img')?.src || null;
-    const logoVerde  = document.getElementById('cn-logo-verde')?.src || null;
-
-    // ── CABEÇALHO CN ─────────────────────────────────────────────────────────────
-    sf(...CN_DARK); doc.rect(0, 0, W, 38, 'F');
-    if (logoBranca) { try { doc.addImage(logoBranca, 'PNG', MR-52, 7, 52, 18); } catch(e) {} }
-    doc.setFontSize(9);  doc.setFont('helvetica','normal'); st(...CN_100);
-    doc.text('Demonstração do', ML, 14);
-    doc.setFontSize(15); doc.setFont('helvetica','bold'); st(255,255,255);
-    doc.text('RESULTADO DO EXERCÍCIO', ML, 24);
+    // --- CABECALHO ---
+    sf(...CN_DARK); doc.rect(0,0,W,38,'F');
+    const logoBranca = document.querySelector('.logo img') ? document.querySelector('.logo img').src : null;
+    if (logoBranca) { try { doc.addImage(logoBranca,'PNG',MR-50,7,46,16); } catch(e){} }
     doc.setFontSize(7.5); doc.setFont('helvetica','normal'); st(...CN_100);
-    doc.text(`Período: ${periodText}   ·   Emissão: ${new Date().toLocaleDateString('pt-BR')}`, ML, 33);
+    doc.text('CN MANAUS', ML, 12);
+    doc.setFontSize(13); doc.setFont('helvetica','bold'); st(255,255,255);
+    doc.text('DEMONSTRACAO DO RESULTADO DO EXERCICIO', ML, 23);
+    doc.setFontSize(7); doc.setFont('helvetica','normal'); st(...CN_100);
+    const hoje = new Date();
+    const hd=hoje.getDate().toString().padStart(2,'0'), hm=(hoje.getMonth()+1).toString().padStart(2,'0'), hy=hoje.getFullYear();
+    doc.text('Periodo: '+periodText+'   Emissao: '+hd+'/'+hm+'/'+hy, ML, 31);
 
-    // ── 3 BLOCOS RESUMO ───────────────────────────────────────────────────────
-    const bW = CW / 3 - 3;
-    const summaryBlocks = [
-        { label: 'RECEITA BRUTA',     val: this.formatCurrency(totalRec),            sign: '+', col: CN_IN,  bg: [227,241,232] },
-        { label: 'TOTAL DE DESPESAS', val: this.formatCurrency(totalDesp),           sign: '-', col: CN_OUT, bg: [248,230,221] },
-        { label: 'RESULTADO LÍQUIDO', val: this.formatCurrency(Math.abs(resultado)), sign: resultado >= 0 ? '+' : '-', col: resultado>=0?CN_IN:CN_OUT, bg: CN_LIGHT },
-    ];
-    summaryBlocks.forEach((b, i) => {
-        const x = ML + i * (bW + 3);
-        const cY = 41;
-        sf(255,255,255); doc.rect(x, cY, bW, 16, 'F');
-        sd(...CN_BORDER); doc.setLineWidth(0.2); doc.rect(x, cY, bW, 16, 'S');
-        doc.setFontSize(6); doc.setFont('helvetica','bold'); st(...CN_TEXT2);
-        doc.text(b.label, x + bW/2, cY+5, {align:'center'});
-        doc.setFontSize(10); doc.setFont('helvetica','bold'); st(...b.col);
-        doc.text(`${b.sign} ${b.val}`, x + bW/2, cY+12.5, {align:'center'});
+    // --- 3 CARDS RESUMO via autoTable ---
+    doc.autoTable({
+        startY:42, margin:{left:ML,right:W-MR}, tableWidth:CW,
+        head:[[
+            {content:'RECEITA BRUTA',    styles:{halign:'center',fillColor:[255,255,255],textColor:CN_TEXT2,fontSize:6,fontStyle:'bold'}},
+            {content:'TOTAL DE DESPESAS',styles:{halign:'center',fillColor:[255,255,255],textColor:CN_TEXT2,fontSize:6,fontStyle:'bold'}},
+            {content:'RESULTADO LIQUIDO',styles:{halign:'center',fillColor:[255,255,255],textColor:CN_TEXT2,fontSize:6,fontStyle:'bold'}},
+        ]],
+        body:[[
+            {content:'+ '+fc(totalRec),                                 styles:{halign:'center',fillColor:[255,255,255],textColor:CN_IN, fontSize:10,fontStyle:'bold'}},
+            {content:'- '+fc(totalDesp),                                styles:{halign:'center',fillColor:[255,255,255],textColor:CN_OUT,fontSize:10,fontStyle:'bold'}},
+            {content:(resultado>=0?'+ ':'- ')+fc(Math.abs(resultado)),  styles:{halign:'center',fillColor:[255,255,255],textColor:resultado>=0?CN_IN:CN_OUT,fontSize:10,fontStyle:'bold'}},
+        ]],
+        styles:{lineColor:CN_BORDER,lineWidth:0.2,cellPadding:{top:2,bottom:3,left:2,right:2}},
+        theme:'plain',
     });
 
-    let y = 62;
-
-    // ── HELPERS ───────────────────────────────────────────────────────────────
-    const checkPage = (needed = 35) => {
-        if (y > H - needed) { doc.addPage(); y = 15; }
-    };
-
-    const secHeader = (num, txt) => {
-        checkPage(40);
-        y += 2;
-        sf(255,255,255); doc.rect(ML, y, CW, 8, 'F');
-        sd(...CN_BORDER); doc.setLineWidth(0.2); doc.rect(ML, y, CW, 8, 'S');
-        doc.setFontSize(9); doc.setFont('helvetica','bold'); st(...CN_DARK);
-        doc.text(`${num}   ${txt}`, ML+4, y+5.5);
-        sd(...CN_PRI); doc.setLineWidth(0.4); doc.line(ML, y+8, ML+CW, y+8);
-        y += 10;
-    };
-
-    const PCT_COL = MR - 26;
-
-    const itemRow = (label, val, pct, shade) => {
-        checkPage();
-        shade ? sf(...CN_ZEBRA) : sf(255,255,255);
-        doc.rect(ML, y, CW, 6.5, 'F');
-        sd(...CN_DIV); doc.setLineWidth(0.1); doc.line(ML, y+6.5, MR, y+6.5);
-        doc.setFontSize(7.5); doc.setFont('helvetica','normal'); st(...CN_TEXT);
-        doc.text(label, ML+4, y+4.4);
-        if (pct) { doc.setFontSize(7); st(...CN_TEXT2); doc.text(pct, PCT_COL, y+4.4, {align:'right'}); }
-        doc.setFontSize(7.5); doc.setFont('helvetica','bold'); st(...CN_TEXT);
-        doc.text(this.formatCurrency(val), MR, y+4.4, {align:'right'});
-        y += 6.5;
-    };
-
-    const subtotalRow = (label, val) => {
-        checkPage();
-        sf(...CN_LIGHT); doc.rect(ML, y, CW, 8, 'F');
-        sd(...CN_PRI); doc.setLineWidth(0.4); doc.line(ML, y, ML+CW, y);
-        sd(...CN_BORDER); doc.setLineWidth(0.2); doc.line(ML, y+8, ML+CW, y+8);
-        doc.setFontSize(8.5); doc.setFont('helvetica','bold'); st(...CN_DARK);
-        doc.text(label, ML+4, y+5.4);
-        doc.text(this.formatCurrency(val), MR, y+5.4, {align:'right'});
-        y += 9.5;
-    };
-
-    // ── SEÇÃO RECEITAS ────────────────────────────────────────────────────────
-    secHeader('1.', 'RECEITAS OPERACIONAIS');
-    const recList = Object.entries(receitas).sort((a,b)=>b[1]-a[1]);
-    recList.forEach(([cat,val], i) => {
-        const pct = totalRec > 0 ? (val/totalRec*100).toFixed(1)+'%' : '0%';
-        itemRow(cat, val, pct, i%2===0);
+    // --- SECAO RECEITAS ---
+    const recEntries = Object.entries(receitas).sort((a,b)=>b[1]-a[1]);
+    const recRows = recEntries.map(function(entry,i){
+        const cat=entry[0], val=entry[1];
+        return [
+            {content:cat,                                                    styles:{fillColor:i%2?CN_ZEBRA:[255,255,255],textColor:CN_TEXT,fontSize:7.5}},
+            {content:totalRec>0?(val/totalRec*100).toFixed(1)+'%':'0%',     styles:{halign:'right',fillColor:i%2?CN_ZEBRA:[255,255,255],textColor:CN_TEXT2,fontSize:7}},
+            {content:fc(val),                                                styles:{halign:'right',fillColor:i%2?CN_ZEBRA:[255,255,255],textColor:CN_TEXT,fontSize:7.5,fontStyle:'bold'}},
+        ];
     });
-    if (recList.length === 0) itemRow('Nenhuma receita no período', 0, '', false);
-    y += 1;
-    subtotalRow('(=)   RECEITA BRUTA TOTAL', totalRec);
-
-    y += 5;
-
-    // ── SEÇÃO DESPESAS ────────────────────────────────────────────────────────
-    secHeader('2.', 'DESPESAS OPERACIONAIS');
-    const despList = Object.entries(despesas).sort((a,b)=>b[1]-a[1]);
-    despList.forEach(([cat,val], i) => {
-        const pct = totalDesp > 0 ? (val/totalDesp*100).toFixed(1)+'%' : '0%';
-        itemRow(cat, val, pct, i%2===0);
+    if (recRows.length===0) recRows.push([{content:'Nenhuma receita no periodo',colSpan:3,styles:{fillColor:[255,255,255],textColor:CN_TEXT2,fontSize:7.5}}]);
+    recRows.push([
+        {content:'(=)  RECEITA BRUTA TOTAL',colSpan:2,styles:{fillColor:CN_LIGHT,textColor:CN_DARK,fontSize:8.5,fontStyle:'bold',cellPadding:{top:3,bottom:3,left:5,right:5}}},
+        {content:fc(totalRec),              styles:{halign:'right',fillColor:CN_LIGHT,textColor:CN_DARK,fontSize:8.5,fontStyle:'bold',cellPadding:{top:3,bottom:3,left:5,right:5}}},
+    ]);
+    doc.autoTable({
+        startY:doc.lastAutoTable.finalY+6, margin:{left:ML,right:W-MR}, tableWidth:CW,
+        head:[[{content:'1.  RECEITAS OPERACIONAIS',colSpan:3,styles:{fillColor:CN_PRI,textColor:[255,255,255],fontSize:8.5,fontStyle:'bold',cellPadding:{top:3,bottom:3,left:5,right:5}}}]],
+        body:recRows,
+        columnStyles:{0:{cellWidth:'auto'},1:{cellWidth:22},2:{cellWidth:34}},
+        styles:{lineColor:CN_BORDER,lineWidth:0.1,cellPadding:{top:2,bottom:2,left:5,right:5}},
+        theme:'plain',
     });
-    if (despList.length === 0) itemRow('Nenhuma despesa no período', 0, '', false);
-    y += 1;
-    subtotalRow('(-)   TOTAL DE DESPESAS', totalDesp);
 
-    y += 6;
+    // --- SECAO DESPESAS ---
+    const despEntries = Object.entries(despesas).sort((a,b)=>b[1]-a[1]);
+    const despRows = despEntries.map(function(entry,i){
+        const cat=entry[0], val=entry[1];
+        return [
+            {content:cat,                                                     styles:{fillColor:i%2?CN_ZEBRA:[255,255,255],textColor:CN_TEXT,fontSize:7.5}},
+            {content:totalDesp>0?(val/totalDesp*100).toFixed(1)+'%':'0%',    styles:{halign:'right',fillColor:i%2?CN_ZEBRA:[255,255,255],textColor:CN_TEXT2,fontSize:7}},
+            {content:fc(val),                                                 styles:{halign:'right',fillColor:i%2?CN_ZEBRA:[255,255,255],textColor:CN_TEXT,fontSize:7.5,fontStyle:'bold'}},
+        ];
+    });
+    if (despRows.length===0) despRows.push([{content:'Nenhuma despesa no periodo',colSpan:3,styles:{fillColor:[255,255,255],textColor:CN_TEXT2,fontSize:7.5}}]);
+    despRows.push([
+        {content:'(-)  TOTAL DE DESPESAS',colSpan:2,styles:{fillColor:CN_LIGHT,textColor:CN_DARK,fontSize:8.5,fontStyle:'bold',cellPadding:{top:3,bottom:3,left:5,right:5}}},
+        {content:fc(totalDesp),           styles:{halign:'right',fillColor:CN_LIGHT,textColor:CN_DARK,fontSize:8.5,fontStyle:'bold',cellPadding:{top:3,bottom:3,left:5,right:5}}},
+    ]);
+    doc.autoTable({
+        startY:doc.lastAutoTable.finalY+5, margin:{left:ML,right:W-MR}, tableWidth:CW,
+        head:[[{content:'2.  DESPESAS OPERACIONAIS',colSpan:3,styles:{fillColor:CN_DARK,textColor:[255,255,255],fontSize:8.5,fontStyle:'bold',cellPadding:{top:3,bottom:3,left:5,right:5}}}]],
+        body:despRows,
+        columnStyles:{0:{cellWidth:'auto'},1:{cellWidth:22},2:{cellWidth:34}},
+        styles:{lineColor:CN_BORDER,lineWidth:0.1,cellPadding:{top:2,bottom:2,left:5,right:5}},
+        theme:'plain',
+    });
 
-    // ── RESULTADO DO PERÍODO ──────────────────────────────────────────────────
-    checkPage(55);
-    sd(...CN_BORDER); doc.setLineWidth(0.5);
-    doc.line(ML, y, MR, y);
-    doc.setLineWidth(0.2);
-    y += 5;
+    // --- RESULTADO + SALDO ---
+    doc.autoTable({
+        startY:doc.lastAutoTable.finalY+7, margin:{left:ML,right:W-MR}, tableWidth:CW,
+        body:[
+            [
+                {content:'(=)  RESULTADO LIQUIDO DO PERIODO',          styles:{fillColor:CN_DARK,textColor:CN_100,fontSize:9,cellPadding:{top:4,bottom:4,left:5,right:5}}},
+                {content:(resultado>=0?'+ ':'- ')+fc(Math.abs(resultado)), styles:{halign:'right',fillColor:CN_DARK,textColor:resultado>=0?[180,230,195]:[255,170,140],fontSize:11,fontStyle:'bold',cellPadding:{top:4,bottom:4,left:5,right:5}}},
+            ],
+            [
+                {content:'SALDO DA CONTA BANCARIA',                    styles:{fillColor:[255,255,255],textColor:CN_TEXT2,fontSize:8.5,cellPadding:{top:3,bottom:3,left:5,right:5}}},
+                {content:(saldoFinal>=0?'+ ':'- ')+fc(Math.abs(saldoFinal)), styles:{halign:'right',fillColor:[255,255,255],textColor:CN_DARK,fontSize:9,fontStyle:'bold',cellPadding:{top:3,bottom:3,left:5,right:5}}},
+            ],
+        ],
+        columnStyles:{0:{cellWidth:'auto'},1:{cellWidth:50}},
+        styles:{lineColor:CN_BORDER,lineWidth:0.2},
+        theme:'plain',
+    });
 
-    sf(...CN_DARK); doc.rect(ML, y, CW, 13, 'F');
-    doc.setFontSize(9); doc.setFont('helvetica','normal'); st(...CN_100);
-    doc.text('(=)   RESULTADO LÍQUIDO DO PERÍODO', ML+5, y+6);
-    doc.setFontSize(12); doc.setFont('helvetica','bold'); st(resultado>=0?[180,230,195]:[255,170,140]);
-    doc.text(`${resultado>=0?'+ ':'- '}${this.formatCurrency(Math.abs(resultado))}`, MR, y+11, {align:'right'});
-    y += 16;
-
-    // ── SALDO FINAL DAS CONTAS ────────────────────────────────────────────────
-    checkPage(20);
-    sf(255,255,255); doc.rect(ML, y, CW, 10, 'F');
-    sd(...CN_BORDER); doc.setLineWidth(0.2); doc.rect(ML, y, CW, 10, 'S');
-    doc.setFontSize(8.5); doc.setFont('helvetica','normal'); st(...CN_TEXT2);
-    doc.text('SALDO DA CONTA BANCÁRIA', ML+4, y+6.5);
-    doc.setFont('helvetica','bold'); st(...CN_DARK);
-    doc.text(`${saldoFinal>=0?'+ ':'- '}${this.formatCurrency(Math.abs(saldoFinal))}`, MR, y+6.5, {align:'right'});
-    y += 13;
-
-    // ── OBSERVAÇÃO ───────────────────────────────────────────────────────────
+    // --- OBSERVACOES ---
     if (observacao) {
-        checkPage(30);
-        sf(250,250,250); doc.rect(ML, y, CW, 6, 'F');
-        sd(...CN_BORDER); doc.setLineWidth(0.15); doc.rect(ML, y, CW, 6, 'S');
-        doc.setFontSize(7); doc.setFont('helvetica','bold'); st(...CN_DARK);
-        doc.text('OBSERVAÇÕES:', ML+4, y+4);
-        y += 7;
-        doc.setFontSize(8); doc.setFont('helvetica','normal');
-        const linhas = doc.splitTextToSize(observacao, CW - 10);
-        const lh     = 5.5;
-        const altObs = linhas.length * lh + 7;
-        checkPage(altObs + 5);
-        sf(252,252,252); doc.rect(ML, y, CW, altObs, 'F');
-        sd(200,200,200); doc.setLineWidth(0.1); doc.rect(ML, y, CW, altObs, 'S');
-        st(50,50,50);
-        doc.text(linhas, ML+5, y+5, {lineHeightFactor: 1.4});
-        y += altObs + 4;
+        doc.autoTable({
+            startY:doc.lastAutoTable.finalY+5, margin:{left:ML,right:W-MR}, tableWidth:CW,
+            body:[
+                [{content:'OBSERVACOES:',styles:{fillColor:[250,250,250],textColor:CN_DARK,fontSize:7.5,fontStyle:'bold',cellPadding:{top:3,bottom:2,left:5,right:5}}}],
+                [{content:observacao,    styles:{fillColor:[252,252,252],textColor:[50,50,50],fontSize:8,cellPadding:{top:3,bottom:6,left:6,right:6}}}],
+            ],
+            styles:{lineColor:[200,200,200],lineWidth:0.1},
+            theme:'plain',
+        });
     }
 
-    // ── RODAPÉ ────────────────────────────────────────────────────────────────
+    // --- RODAPE (sem align — calculo manual de posicao) ---
     const pages = doc.internal.getNumberOfPages();
-    const logoBrancaF = document.querySelector('.logo img')?.src || null;
-    const logoVerdeF  = document.getElementById('cn-logo-verde')?.src || null;
+    const logoVerde = document.getElementById('cn-logo-verde') ? document.getElementById('cn-logo-verde').src : null;
     for (let p=1; p<=pages; p++) {
         doc.setPage(p);
-        sf(255,255,255); doc.rect(0, H-10, W, 10, 'F');
-        sd(...CN_BORDER); doc.setLineWidth(0.3); doc.line(0, H-10, W, H-10);
+        sf(255,255,255); doc.rect(0,H-10,W,10,'F');
+        sd(...CN_BORDER); doc.setLineWidth(0.3); doc.line(0,H-10,W,H-10);
         doc.setFontSize(7); doc.setFont('helvetica','normal'); st(...CN_TEXT2);
-        if (logoVerdeF) { try { doc.addImage(logoVerdeF,'PNG',ML,H-9,22,8); } catch(e) {} }
-        doc.text('Documento confidencial - uso interno', ML+25, H-4);
-        doc.text(`Página ${p} de ${pages}`, W/2, H-4, {align:'center'});
-        doc.text(`Emitido em ${new Date().toLocaleDateString('pt-BR')}`, MR, H-4, {align:'right'});
+        if (logoVerde) { try { doc.addImage(logoVerde,'PNG',ML,H-9,22,8); } catch(e){} }
+        doc.text('DOCUMENTO CONFIDENCIAL - USO INTERNO', ML+25, H-4);
+        const pgTxt = 'Pagina '+p+' de '+pages;
+        const pgW = doc.getStringUnitWidth(pgTxt) * 7 / doc.internal.scaleFactor;
+        doc.text(pgTxt, W/2 - pgW/2, H-4);
+        const cnTxt = 'CN Manaus';
+        const cnW = doc.getStringUnitWidth(cnTxt) * 7 / doc.internal.scaleFactor;
+        doc.text(cnTxt, MR - cnW, H-4);
     }
 
-    doc.save(`DRE_${periodText.replace(/\s/g,'_').replace(/\//g,'-')}.pdf`);
-    this.showNotification('✅ DRE gerada com sucesso!', 'success');
+    doc.save('DRE_'+periodText.replace(/\s/g,'_').replace(/\//g,'-')+'.pdf');
+    this.showNotification('DRE gerada com sucesso!', 'success');
 }
 
 // ===== RELATÓRIO COMPARATIVO MENSAL =====
