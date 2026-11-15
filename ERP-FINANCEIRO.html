@@ -5606,7 +5606,7 @@
                         sd(...CN_BORDER); doc.setLineWidth(0.3); doc.line(0, H-10, W, H-10);
                         doc.setFontSize(7); doc.setFont('helvetica','normal'); st(...CN_TEXT2);
                         if (logoVerde) { try { doc.addImage(logoVerde,'PNG',ML,H-9,22,8); } catch(e) {} }
-                        doc.text('Documento confidencial — uso interno', ML+25, H-4);
+                        doc.text('Documento confidencial - uso interno', ML+25, H-4);
                         doc.text(`Página ${data.pageNumber}`, W/2, H-4, {align:'center'});
                         doc.text(`Emitido em ${new Date().toLocaleDateString('pt-BR')}`, MR, H-4, {align:'right'});
                     }
@@ -7723,7 +7723,7 @@
                         sd(...CN_BORDER); doc.setLineWidth(0.3); doc.line(0, H-10, W, H-10);
                         doc.setFontSize(7); doc.setFont('helvetica','normal'); st(...CN_TEXT2);
                         if (logoVerde) { try { doc.addImage(logoVerde,'PNG',ML,H-9,22,8); } catch(e) {} }
-                        doc.text('Documento confidencial — uso interno', ML+25, H-4);
+                        doc.text('Documento confidencial - uso interno', ML+25, H-4);
                         doc.text(`Página ${data.pageNumber}`, W/2, H-4, {align:'center'});
                         doc.text(`Emitido em ${new Date().toLocaleDateString('pt-BR')}`, MR, H-4, {align:'right'});
                     }
@@ -8101,7 +8101,7 @@ exportCategoryToPDF(days, startDate, endDate, observacao = '') {
         sd(...CN_BORDER); doc.setLineWidth(0.3); doc.line(0, H-10, W, H-10);
         doc.setFontSize(7); doc.setFont('helvetica','normal'); st(...CN_TEXT2);
         if (logoVerdeF) { try { doc.addImage(logoVerdeF,'PNG',ML,H-9,22,8); } catch(e) {} }
-        doc.text('Documento confidencial — uso interno', ML+25, H-4);
+        doc.text('Documento confidencial - uso interno', ML+25, H-4);
         doc.text(`Página ${p} de ${pages}`, W/2, H-4, {align:'center'});
         doc.text(`Emitido em ${new Date().toLocaleDateString('pt-BR')}`, MR, H-4, {align:'right'});
     }
@@ -8403,7 +8403,7 @@ exportComparativoPDF() {
         sd(...CN_BORDER); doc.setLineWidth(0.3); doc.line(0,H-10,W,H-10);
         doc.setFontSize(7); doc.setFont('helvetica','normal'); st(...CN_TEXT2);
         if (logoVerde) { try { doc.addImage(logoVerde,'PNG',ML,H-9,22,8); } catch(e) {} }
-        doc.text('Documento confidencial — uso interno', ML+25, H-4);
+        doc.text('Documento confidencial - uso interno', ML+25, H-4);
         doc.text(`Página ${p} de ${pages}`, W/2, H-4, {align:'center'});
         doc.text(`Emitido em ${new Date().toLocaleDateString('pt-BR')}`, MR, H-4, {align:'right'});
     }
@@ -8740,7 +8740,9 @@ exportCategoryToExcel(days, startDate, endDate) {
                 return new Intl.NumberFormat('pt-BR', {
                     style: 'currency',
                     currency: 'BRL'
-                }).format(value);
+                // Strip narrow no-break space (U+202F) and non-breaking space (U+00A0)
+                // used by modern Chrome in currency formatting — jsPDF helvetica has no glyph for these
+                }).format(value).replace(/[  ]/g, ' ');
             }
 
             formatDate(dateStr) {
