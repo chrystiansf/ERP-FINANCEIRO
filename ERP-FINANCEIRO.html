@@ -4570,9 +4570,13 @@
                     return;
                 }
 
+                const beforeIds = new Set(this.db.transactions.map(t => t.id));
                 this.db.importTransactions(accountId, rows);
+                const newIds = this.db.transactions.filter(t => !beforeIds.has(t.id)).map(t => t.id);
+                const matched = this.autoMatchParties(newIds);
                 this.closeModal('import-preview-modal');
-                this.showNotification(`✅ ${rows.length} lançamento(s) importado(s) com sucesso!`, 'success');
+                const matchMsg = matched > 0 ? ` ${matched} fornecedor(es)/cliente(s) preenchido(s) automaticamente.` : '';
+                this.showNotification(`✅ ${rows.length} lançamento(s) importado(s) com sucesso!${matchMsg}`, 'success');
                 this._previewRows = [];
                 this._importPendingAccountId = null;
                 // Resetar filtros para garantir que os lançamentos importados apareçam
@@ -5402,6 +5406,56 @@
                 this.showNotification(`✅ Categoria aplicada em ${ok} transação(ões).`, 'success');
                 this.updateBulkDeleteButton();
                 this.loadTransactions();
+            }
+
+            // ── AUTO-MATCH FORNECEDOR/CLIENTE POR DESCRIÇÃO ─────────────────
+            _normalizeStr(str) {
+                return String(str || '')
+                    .toLowerCase()
+                    .normalize('NFD').replace(/[̀-ͯ]/g, '')
+                    .replace(/[^a-z0-9\s]/g, ' ')
+                    .replace(/\s+/g, ' ')
+                    .trim();
+            }
+
+            _partyMatchScore(desc, name) {
+                if (!name || name.length < 3) return 0;
+                if (desc.includes(name)) return 1.0;
+                // sobreposição de palavras significativas (> 2 chars)
+                const dw = new Set(desc.split(' ').filter(w => w.length > 2));
+                const nw = name.split(' ').filter(w => w.length > 2);
+                if (!nw.length) return 0;
+                const hits = nw.filter(w => dw.has(w)).length;
+                return hits / nw.length;
+            }
+
+            autoMatchParties(ids) {
+                const suppliers = this.db.suppliers || [];
+                const customers = this.db.customers || [];
+                let matched = 0;
+
+                ids.forEach(id => {
+                    const t = this.db.transactions.find(t => t.id === id);
+                    if (!t || !t.description || t.supplier || t.customer) return;
+
+                    const desc = this._normalizeStr(t.description);
+                    const pool = t.type === 'expense' ? suppliers : customers;
+                    let best = null, bestScore = 0;
+
+                    pool.forEach(p => {
+                        const score = this._partyMatchScore(desc, this._normalizeStr(p.name));
+                        if (score > bestScore) { bestScore = score; best = p; }
+                    });
+
+                    if (best && bestScore >= 0.6) {
+                        if (t.type === 'expense') t.supplier = best.id;
+                        else                       t.customer = best.id;
+                        matched++;
+                    }
+                });
+
+                if (matched > 0) this.db.save();
+                return matched;
             }
 
             loadDashboard() {
