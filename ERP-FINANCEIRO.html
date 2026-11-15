@@ -1865,6 +1865,10 @@
                             <i class="fas fa-file-import"></i>
                             Importar Extrato
                         </button>
+                        <button class="btn btn-secondary" onclick="app.autoMatchAllExisting()" title="Preencher fornecedor/cliente nas transações que ainda não têm, baseado na descrição">
+                            <i class="fas fa-magic"></i>
+                            Auto-preencher Fornecedor/Cliente
+                        </button>
                         <button class="btn btn-success" id="add-income-btn" style="background: #10B981; border: none;">
                             <i class="fas fa-arrow-up"></i>
                             Nova Receita
@@ -5406,6 +5410,23 @@
                 this.showNotification(`✅ Categoria aplicada em ${ok} transação(ões).`, 'success');
                 this.updateBulkDeleteButton();
                 this.loadTransactions();
+            }
+
+            autoMatchAllExisting() {
+                const all = this.db.transactions || [];
+                const unmatched = all.filter(t => !t.supplier && !t.customer && t.description);
+                if (unmatched.length === 0) {
+                    this.showNotification('Todas as transações já têm fornecedor/cliente preenchido.', 'info');
+                    return;
+                }
+                const ids = unmatched.map(t => t.id);
+                const matched = this.autoMatchParties(ids);
+                if (matched > 0) {
+                    this.showNotification(`✅ ${matched} fornecedor(es)/cliente(s) preenchido(s) automaticamente de ${unmatched.length} transações verificadas.`, 'success');
+                    this.loadTransactions();
+                } else {
+                    this.showNotification(`Nenhuma correspondência encontrada em ${unmatched.length} transações. Verifique se os fornecedores/clientes estão cadastrados.`, 'warning');
+                }
             }
 
             // ── AUTO-MATCH FORNECEDOR/CLIENTE POR DESCRIÇÃO ─────────────────
