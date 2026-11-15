@@ -1716,6 +1716,9 @@
                             <i class="fas fa-upload"></i> Restaurar
                         </button>
                     </div>
+                    <button onclick="app.openRestoreCategoriesModal()" class="btn-small" style="width:100%;margin-top:8px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.25);border-radius:7px;padding:6px 8px;cursor:pointer;color:rgba(255,255,255,0.85);font-size:0.78rem;display:flex;align-items:center;justify-content:center;gap:6px;">
+                        <i class="fas fa-history"></i> Restaurar Categorias Seletivamente
+                    </button>
                 </div>
 
                 <button id="theme-toggle-btn" onclick="app.toggleTheme()" title="Alternar tema claro/escuro" style="width:100%;margin-top:10px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.18);border-radius:8px;padding:7px 12px;cursor:pointer;color:rgba(255,255,255,0.85);font-size:0.85rem;display:flex;align-items:center;justify-content:center;gap:8px;transition:background 0.2s;">
@@ -9088,6 +9091,138 @@ exportCategoryToExcel(days, startDate, endDate) {
                 URL.revokeObjectURL(url);
                 
                 this.showNotification('✅ Backup salvo com sucesso!', 'success');
+            }
+
+            openRestoreCategoriesModal() {
+                const existing = document.getElementById('restore-cat-modal');
+                if (existing) existing.remove();
+                const modal = document.createElement('div');
+                modal.id = 'restore-cat-modal';
+                modal.className = 'modal';
+                modal.style.display = 'flex';
+                modal.innerHTML = `
+                    <div class="modal-content" style="max-width:480px;">
+                        <div class="modal-header">
+                            <h3><i class="fas fa-history" style="margin-right:8px;"></i>Restaurar Categorias Seletivamente</h3>
+                            <button class="btn-close" onclick="document.getElementById('restore-cat-modal').remove()">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </div>
+                        <div style="padding:20px 24px;">
+                            <p style="font-size:0.85rem;color:var(--text-secondary);margin:0 0 16px;">
+                                Carregue um backup antigo. Somente o campo <strong>Categoria</strong> será restaurado nas transações que você especificar — nenhum outro dado é alterado.
+                            </p>
+                            <div class="form-group" style="margin-bottom:12px;">
+                                <label style="font-weight:600;margin-bottom:6px;display:block;">1. Arquivo de backup (.json)</label>
+                                <input type="file" id="rcat-file" accept=".json"
+                                    style="width:100%;padding:8px;background:var(--bg-input);border:1px solid var(--border-color);border-radius:8px;color:var(--text-primary);font-size:0.85rem;cursor:pointer;">
+                            </div>
+                            <div class="form-row" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">
+                                <div class="form-group">
+                                    <label style="font-weight:600;margin-bottom:6px;display:block;">2. Data inicial</label>
+                                    <input type="date" id="rcat-start" style="width:100%;padding:8px;background:var(--bg-input);border:1px solid var(--border-color);border-radius:8px;color:var(--text-primary);">
+                                </div>
+                                <div class="form-group">
+                                    <label style="font-weight:600;margin-bottom:6px;display:block;">Data final</label>
+                                    <input type="date" id="rcat-end" style="width:100%;padding:8px;background:var(--bg-input);border:1px solid var(--border-color);border-radius:8px;color:var(--text-primary);">
+                                </div>
+                            </div>
+                            <div class="form-group" style="margin-bottom:16px;">
+                                <label style="font-weight:600;margin-bottom:6px;display:block;">3. Tipo de transação</label>
+                                <select id="rcat-type" style="width:100%;padding:8px;background:var(--bg-input);border:1px solid var(--border-color);border-radius:8px;color:var(--text-primary);">
+                                    <option value="expense">Somente Saídas</option>
+                                    <option value="income">Somente Entradas</option>
+                                    <option value="all">Ambos</option>
+                                </select>
+                            </div>
+                            <div id="rcat-preview" style="display:none;padding:10px 12px;background:var(--bg-hover);border-radius:8px;font-size:0.82rem;color:var(--text-secondary);margin-bottom:16px;"></div>
+                            <div style="display:flex;gap:10px;">
+                                <button class="btn btn-secondary" style="flex:1;" onclick="document.getElementById('restore-cat-modal').remove()">Cancelar</button>
+                                <button class="btn btn-secondary" style="flex:1;" onclick="app.previewRestoreCategories()">
+                                    <i class="fas fa-search"></i> Pré-visualizar
+                                </button>
+                                <button class="btn btn-primary" style="flex:1;" id="rcat-apply-btn" disabled onclick="app.applyRestoreCategories()">
+                                    <i class="fas fa-check"></i> Aplicar
+                                </button>
+                            </div>
+                        </div>
+                    </div>`;
+                document.body.appendChild(modal);
+                modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
+                this._rcatBackup = null;
+                this._rcatMatches = null;
+                // ao selecionar arquivo, faz parse imediato
+                modal.querySelector('#rcat-file').addEventListener('change', e => {
+                    const file = e.target.files[0];
+                    if (!file) return;
+                    const reader = new FileReader();
+                    reader.onload = ev => {
+                        try {
+                            this._rcatBackup = JSON.parse(ev.target.result);
+                            if (!this._rcatBackup.transactions) throw new Error('inválido');
+                            const dateStr = this._rcatBackup.exportDate
+                                ? new Date(this._rcatBackup.exportDate).toLocaleDateString('pt-BR') : '?';
+                            document.getElementById('rcat-preview').style.display = 'block';
+                            document.getElementById('rcat-preview').innerHTML =
+                                `✅ Backup carregado — ${this._rcatBackup.transactions.length} transações encontradas (exportado em ${dateStr}).<br>Defina o período e clique em <strong>Pré-visualizar</strong>.`;
+                        } catch(err) {
+                            this.showNotification('Arquivo de backup inválido.', 'error');
+                            this._rcatBackup = null;
+                        }
+                    };
+                    reader.readAsText(file);
+                });
+            }
+
+            previewRestoreCategories() {
+                if (!this._rcatBackup) { this.showNotification('Carregue o arquivo de backup primeiro.', 'warning'); return; }
+                const start = document.getElementById('rcat-start').value;
+                const end   = document.getElementById('rcat-end').value;
+                const type  = document.getElementById('rcat-type').value;
+                if (!start || !end) { this.showNotification('Informe o período.', 'warning'); return; }
+                if (start > end)    { this.showNotification('Data inicial maior que data final.', 'warning'); return; }
+
+                // Indexar transações do backup por ID
+                const backupById = new Map(this._rcatBackup.transactions.map(t => [t.id, t]));
+
+                // Encontrar matches: mesma ID, no período, do tipo certo
+                this._rcatMatches = this.db.transactions.filter(t => {
+                    if (!t.date || t.date < start || t.date > end) return false;
+                    if (type !== 'all' && t.type !== type) return false;
+                    const bk = backupById.get(t.id);
+                    return bk && bk.category !== undefined;
+                });
+
+                const changed = this._rcatMatches.filter(t => {
+                    const bk = backupById.get(t.id);
+                    return String(bk.category) !== String(t.category);
+                });
+
+                const prev = document.getElementById('rcat-preview');
+                prev.style.display = 'block';
+                if (this._rcatMatches.length === 0) {
+                    prev.innerHTML = `⚠️ Nenhuma transação encontrada com esses filtros no backup.`;
+                    document.getElementById('rcat-apply-btn').disabled = true;
+                } else {
+                    prev.innerHTML = `<strong>${this._rcatMatches.length}</strong> transações encontradas no período.<br>
+                        <strong style="color:var(--primary);">${changed.length}</strong> terão a categoria restaurada (as demais já coincidem).`;
+                    document.getElementById('rcat-apply-btn').disabled = changed.length === 0;
+                    this._rcatBackupById = backupById;
+                }
+            }
+
+            applyRestoreCategories() {
+                if (!this._rcatMatches || !this._rcatBackupById) return;
+                let restored = 0;
+                this._rcatMatches.forEach(t => {
+                    const bk = this._rcatBackupById.get(t.id);
+                    if (bk && bk.category !== undefined) { t.category = bk.category; restored++; }
+                });
+                this.db.save();
+                document.getElementById('restore-cat-modal')?.remove();
+                this._rcatBackup = null; this._rcatMatches = null; this._rcatBackupById = null;
+                this.showNotification(`✅ ${restored} categoria(s) restaurada(s) com sucesso!`, 'success');
+                this.loadTransactions();
             }
 
             importBackup() {
