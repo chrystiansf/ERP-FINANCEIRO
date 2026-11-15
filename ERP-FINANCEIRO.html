@@ -1861,6 +1861,10 @@
                             <i class="fas fa-tag"></i>
                             Classificar Categoria (<span id="bulk-classify-count">0</span>)
                         </button>
+                        <button class="btn btn-secondary" onclick="app.exportTransactionsPDF()" title="Exportar PDF com as transações visíveis (considera filtros ativos)">
+                            <i class="fas fa-file-pdf"></i>
+                            PDF
+                        </button>
                         <button class="btn btn-secondary" id="import-btn">
                             <i class="fas fa-file-import"></i>
                             Importar Extrato
@@ -5412,6 +5416,204 @@
                 this.loadTransactions();
             }
 
+            exportTransactionsPDF() {
+                // ── Reusar a mesma lógica de filtro do loadTransactions ──────
+                const filters = {
+                    search:    document.getElementById('search-transaction')?.value || '',
+                    type:      document.getElementById('filter-type')?.value || '',
+                    account:   document.getElementById('filter-account')?.value || '',
+                    status:    document.getElementById('filter-status')?.value || '',
+                    period:    document.getElementById('filter-period')?.value || '',
+                    startDate: document.getElementById('filter-start-date')?.value || '',
+                    endDate:   document.getElementById('filter-end-date')?.value || ''
+                };
+                const msCategory   = this.msSelected?.category;
+                const msMinistry   = this.msSelected?.ministry;
+                const msCostcenter = this.msSelected?.costcenter;
+
+                let transactions = this.db.getTransactions(filters);
+                if (filters.period && filters.period !== 'custom' && !filters.period.startsWith('month:')) {
+                    const days = parseInt(filters.period);
+                    const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - days);
+                    const cutoffStr = cutoff.toISOString().split('T')[0];
+                    transactions = transactions.filter(t => t.date >= cutoffStr);
+                } else if (filters.period && filters.period.startsWith('month:')) {
+                    const ym = filters.period.slice(6);
+                    transactions = transactions.filter(t => t.date && t.date.startsWith(ym));
+                } else if (filters.period === 'custom' && filters.startDate && filters.endDate) {
+                    transactions = transactions.filter(t => t.date >= filters.startDate && t.date <= filters.endDate);
+                }
+                if (msCategory && msCategory.size > 0) {
+                    const allCats = this.db.getCategories().map(c => String(c.id));
+                    if (!allCats.every(id => msCategory.has(id)))
+                        transactions = transactions.filter(t => msCategory.has(t.category ? String(t.category) : ''));
+                }
+                if (msMinistry && msMinistry.size > 0) {
+                    const allMin = this.db.getMinistries().map(m => String(m.id));
+                    if (allMin.length > 0 && !allMin.every(id => msMinistry.has(id)))
+                        transactions = transactions.filter(t => msMinistry.has(t.ministry ? String(t.ministry) : ''));
+                }
+                if (msCostcenter && msCostcenter.size > 0) {
+                    const allCC = this.db.getCostCenters().map(c => String(c.id));
+                    if (allCC.length > 0 && !allCC.every(id => msCostcenter.has(id)))
+                        transactions = transactions.filter(t => msCostcenter.has(t.costcenter ? String(t.costcenter) : ''));
+                }
+
+                if (transactions.length === 0) {
+                    this.showNotification('Nenhuma transação para exportar com os filtros atuais.', 'warning');
+                    return;
+                }
+
+                // ── Gerar PDF ────────────────────────────────────────────────
+                const { jsPDF } = window.jspdf;
+                const doc = new jsPDF('portrait', 'mm', 'a4');
+                const W = 210, H = 297, ML = 15, MR = 195, CW = 180;
+                const CN_DARK   = [16,48,42];
+                const CN_PRI    = [30,77,65];
+                const CN_TEXT   = [23,34,31];
+                const CN_TEXT2  = [79,93,88];
+                const CN_BORDER = [220,227,223];
+                const CN_DIV    = [230,236,233];
+                const CN_ZEBRA  = [247,249,248];
+                const CN_IN     = [27,110,70];
+                const CN_IN_BG  = [227,241,232];
+                const CN_OUT    = [154,67,32];
+                const CN_OUT_BG = [248,230,221];
+                const CN_100    = [223,234,229];
+                const sf = (r,g,b) => doc.setFillColor(r,g,b);
+                const st = (r,g,b) => doc.setTextColor(r,g,b);
+                const sd = (r,g,b) => doc.setDrawColor(r,g,b);
+
+                const logoBranca = document.querySelector('.logo img')?.src || null;
+                const logoVerde  = document.getElementById('cn-logo-verde')?.src || null;
+
+                // Totais
+                const totalInc  = transactions.filter(t=>t.type==='income').reduce((s,t)=>s+t.amount,0);
+                const totalExp  = transactions.filter(t=>t.type==='expense').reduce((s,t)=>s+t.amount,0);
+                const pending   = transactions.filter(t=>!t.reconciled).length;
+
+                // Descrição dos filtros ativos
+                let filterDesc = '';
+                if (filters.status === 'pending')    filterDesc += 'Pendentes · ';
+                if (filters.status === 'reconciled') filterDesc += 'Conciliadas · ';
+                if (filters.type   === 'income')     filterDesc += 'Somente Entradas · ';
+                if (filters.type   === 'expense')    filterDesc += 'Somente Saídas · ';
+                if (filters.search)                  filterDesc += `Busca: "${filters.search}" · `;
+                if (filters.period === 'custom' && filters.startDate && filters.endDate)
+                    filterDesc += `${this.formatDate(filters.startDate)} a ${this.formatDate(filters.endDate)} · `;
+                filterDesc = filterDesc.replace(/ · $/, '') || 'Todos os registros';
+
+                // ── CABEÇALHO ────────────────────────────────────────────────
+                sf(...CN_DARK); doc.rect(0, 0, W, 36, 'F');
+                if (logoBranca) { try { doc.addImage(logoBranca, 'PNG', MR-50, 6, 48, 17); } catch(e) {} }
+                doc.setFontSize(9); doc.setFont('helvetica','normal'); st(...CN_100);
+                doc.text('Relatório de', ML, 13);
+                doc.setFontSize(15); doc.setFont('helvetica','bold'); st(255,255,255);
+                doc.text('TRANSAÇÕES', ML, 23);
+                doc.setFontSize(7.5); doc.setFont('helvetica','normal'); st(...CN_100);
+                doc.text(`Filtro: ${filterDesc}   ·   Emissão: ${new Date().toLocaleDateString('pt-BR')}`, ML, 31);
+
+                // ── 3 CARDS RESUMO ────────────────────────────────────────────
+                const bW = CW / 3 - 2;
+                [
+                    { label:'ENTRADAS',  val: this.formatCurrency(totalInc),  col: CN_IN  },
+                    { label:'SAÍDAS',    val: this.formatCurrency(totalExp),  col: CN_OUT },
+                    { label:'PENDENTES', val: `${pending} lançamento(s)`,     col: CN_TEXT },
+                ].forEach((b, i) => {
+                    const x = ML + i * (bW + 3);
+                    sf(255,255,255); doc.rect(x, 39, bW, 14, 'F');
+                    sd(...CN_BORDER); doc.setLineWidth(0.2); doc.rect(x, 39, bW, 14, 'S');
+                    doc.setFontSize(5.5); doc.setFont('helvetica','bold'); st(...CN_TEXT2);
+                    doc.text(b.label, x + bW/2, 44, {align:'center'});
+                    doc.setFontSize(9); doc.setFont('helvetica','bold'); st(...b.col);
+                    doc.text(b.val, x + bW/2, 50.5, {align:'center'});
+                });
+
+                // ── TABELA ────────────────────────────────────────────────────
+                const tableData = transactions.map(t => {
+                    const cat  = this.db.getCategory(parseInt(t.category));
+                    let party = '-';
+                    if (t.type === 'income' && t.customer) {
+                        const c = this.db.customers.find(c => c.id == t.customer || c.name === t.customer);
+                        party = c ? c.name : String(t.customer);
+                    } else if (t.type === 'expense' && t.supplier) {
+                        const s = this.db.suppliers.find(s => s.id == t.supplier || s.name === t.supplier);
+                        party = s ? s.name : String(t.supplier);
+                    }
+                    return [
+                        this.formatDate(t.date),
+                        (t.description || '').substring(0, 45),
+                        t.type === 'income' ? 'ENTRADA' : 'SAÍDA',
+                        (t.type === 'income' ? '+ ' : '- ') + this.formatCurrency(t.amount),
+                        party.substring(0, 25),
+                        cat ? (cat.name || '-').substring(0, 22) : '-',
+                        t.reconciled ? 'Conciliada' : 'Pendente',
+                    ];
+                });
+
+                doc.autoTable({
+                    head: [['DATA','DESCRIÇÃO','TIPO','VALOR','FORN./CLIENTE','CATEGORIA','STATUS']],
+                    body: tableData,
+                    startY: 57,
+                    margin: { left: ML, right: 15 },
+                    styles: {
+                        fontSize: 7,
+                        cellPadding: { top:2.5, bottom:2.5, left:2.5, right:2.5 },
+                        textColor: CN_TEXT,
+                        lineColor: CN_DIV,
+                        lineWidth: 0.12,
+                        font: 'helvetica',
+                    },
+                    headStyles: {
+                        fillColor: CN_PRI,
+                        textColor: [255,255,255],
+                        fontStyle: 'bold',
+                        fontSize: 7,
+                        halign: 'center',
+                        cellPadding: { top:3, bottom:3, left:2.5, right:2.5 },
+                    },
+                    alternateRowStyles: { fillColor: CN_ZEBRA },
+                    tableWidth: CW,
+                    columnStyles: {
+                        0: { cellWidth: 22, halign: 'center' },
+                        1: { cellWidth: 55 },
+                        2: { cellWidth: 18, halign: 'center', fontStyle: 'bold' },
+                        3: { cellWidth: 28, halign: 'right',  fontStyle: 'bold' },
+                        4: { cellWidth: 28 },
+                        5: { cellWidth: 20 },
+                        6: { cellWidth: 19, halign: 'center' },
+                    },
+                    didParseCell: (data) => {
+                        if (data.section !== 'body') return;
+                        const t = transactions[data.row.index];
+                        if (!t) return;
+                        if (data.column.index === 2) {
+                            data.cell.styles.textColor  = t.type==='income' ? CN_IN : CN_OUT;
+                            data.cell.styles.fillColor  = t.type==='income' ? CN_IN_BG : CN_OUT_BG;
+                        }
+                        if (data.column.index === 3) {
+                            data.cell.styles.textColor = t.type==='income' ? CN_IN : CN_OUT;
+                        }
+                        if (data.column.index === 6) {
+                            data.cell.styles.textColor = t.reconciled ? CN_IN : CN_OUT;
+                        }
+                    },
+                    didDrawPage: (data) => {
+                        sf(255,255,255); doc.rect(0, H-10, W, 10, 'F');
+                        sd(...CN_BORDER); doc.setLineWidth(0.3); doc.line(0, H-10, W, H-10);
+                        doc.setFontSize(7); doc.setFont('helvetica','normal'); st(...CN_TEXT2);
+                        if (logoVerde) { try { doc.addImage(logoVerde,'PNG',ML,H-9,22,8); } catch(e) {} }
+                        doc.text('Documento confidencial — uso interno', ML+25, H-4);
+                        doc.text(`Página ${data.pageNumber}`, W/2, H-4, {align:'center'});
+                        doc.text(`Emitido em ${new Date().toLocaleDateString('pt-BR')}`, MR, H-4, {align:'right'});
+                    }
+                });
+
+                const dateStr = new Date().toISOString().split('T')[0];
+                doc.save(`Transacoes_${dateStr}.pdf`);
+                this.showNotification('✅ PDF exportado com sucesso!', 'success');
+            }
+
             autoMatchAllExisting() {
                 const all = this.db.transactions || [];
                 const unmatched = all.filter(t => !t.supplier && !t.customer && t.description);
@@ -6021,6 +6223,7 @@
                             item.textContent = m;
                             item.addEventListener('mousedown', (e) => {
                                 e.preventDefault();
+                                e.stopPropagation();
                                 inputEl.value = m;
                                 removeAc();
                             });
