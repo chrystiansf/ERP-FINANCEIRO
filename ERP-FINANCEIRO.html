@@ -5470,6 +5470,7 @@
                 // ── Gerar PDF ────────────────────────────────────────────────
                 const { jsPDF } = window.jspdf;
                 const doc = new jsPDF('portrait', 'mm', 'a4');
+                { const _o = doc.text.bind(doc); doc.text = function(t,x,y,o,tr){ const s=v=>String(v==null?'':v).replace(/[  ⁠ ]/g,' ').replace(/[−–—]/g,'-').replace(/[^\x20-\xFF]/g,''); t=Array.isArray(t)?t.map(s):s(t); return _o(t,x,y,o,tr); }; }
                 const W = 210, H = 297, ML = 15, MR = 195, CW = 180;
                 const CN_DARK   = [16,48,42];
                 const CN_PRI    = [30,77,65];
@@ -7507,6 +7508,7 @@
             exportCashflowToPDF(days, startDate, endDate, typeFilter = 'all') {
                 const { jsPDF } = window.jspdf;
                 const doc = new jsPDF('landscape', 'mm', 'a4');
+                { const _o = doc.text.bind(doc); doc.text = function(t,x,y,o,tr){ const s=v=>String(v==null?'':v).replace(/[  ⁠ ]/g,' ').replace(/[−–—]/g,'-').replace(/[^\x20-\xFF]/g,''); t=Array.isArray(t)?t.map(s):s(t); return _o(t,x,y,o,tr); }; }
 
                 let transactions, periodText;
                 if (startDate && endDate) {
@@ -7892,6 +7894,22 @@ exportCategoryToPDF(days, startDate, endDate, observacao = '') {
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF('portrait', 'mm', 'a4');
 
+    // jsPDF helvetica only covers Latin-1 (0x00–0xFF). Any char above 0xFF in an
+    // aligned doc.text() call causes NaN in getStringUnitWidth → f3(NaN) → crash.
+    // Patch doc.text to sanitize every string before it reaches the font metrics table.
+    const _origText = doc.text.bind(doc);
+    doc.text = function(txt, x, y, opts, transform) {
+        const san = s => String(s == null ? '' : s)
+            .replace(/ | |⁠/g, ' ')  // narrow/figure no-break space
+            .replace(/ /g, ' ')                // regular no-break space
+            .replace(/−/g, '-')                // Unicode minus sign
+            .replace(/–|—/g, '-')         // en-dash / em-dash
+            .replace(/[^\x20-\xFF]/g, '');          // strip anything else outside Latin-1
+        if (Array.isArray(txt)) txt = txt.map(san);
+        else txt = san(txt);
+        return _origText(txt, x, y, opts, transform);
+    };
+
     let transactions, periodText;
     if (startDate && endDate) {
         transactions = this.db.getTransactions({}).filter(t => t.date >= startDate && t.date <= endDate);
@@ -8261,6 +8279,7 @@ exportComparativoPDF() {
     const data       = this._compCalcData();
     const { jsPDF }  = window.jspdf;
     const doc        = new jsPDF('portrait','mm','a4');
+    { const _o = doc.text.bind(doc); doc.text = function(t,x,y,o,tr){ const s=v=>String(v==null?'':v).replace(/[  ⁠ ]/g,' ').replace(/[−–—]/g,'-').replace(/[^\x20-\xFF]/g,''); t=Array.isArray(t)?t.map(s):s(t); return _o(t,x,y,o,tr); }; }
     const systemName = localStorage.getItem('systemName') || 'ERP Financeiro';
     const logoData   = this.getCompanyLogo();
     const CN_DARK   = [16,48,42];
